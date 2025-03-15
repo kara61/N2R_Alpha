@@ -19,6 +19,7 @@ const FacadeEditor: React.FC = () => {
   const [isDragging, setIsDragging] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [hoveredElementId, setHoveredElementId] = useState<string | null>(null);
   
   // Y-axis offset in meters
   const Y_OFFSET = -1;
@@ -271,26 +272,29 @@ const FacadeEditor: React.FC = () => {
       // Set colors based on element type - industrial theme
       let fillColor, strokeColor;
       
+      const isSelected = element.id === selectedElementId;
+      const isHovered = element.id === hoveredElementId;
+      
       switch (element.type) {
         case ElementType.Window:
-          fillColor = element.id === selectedElementId ? '#F5A623' : '#a3c6e8';
-          strokeColor = element.id === selectedElementId ? '#F7B84B' : '#0066cc';
+          fillColor = isSelected ? '#F5A623' : isHovered ? '#b4d1ee' : '#a3c6e8';
+          strokeColor = isSelected ? '#F7B84B' : isHovered ? '#3387d6' : '#0066cc';
           break;
         case ElementType.Door:
-          fillColor = element.id === selectedElementId ? '#F5A623' : '#4a4a4a';
-          strokeColor = element.id === selectedElementId ? '#F7B84B' : '#333333';
+          fillColor = isSelected ? '#F5A623' : isHovered ? '#5a5a5a' : '#4a4a4a';
+          strokeColor = isSelected ? '#F7B84B' : isHovered ? '#666666' : '#333333';
           break;
         case ElementType.SectionalDoor:
-          fillColor = element.id === selectedElementId ? '#F5A623' : '#5a5a5a';
-          strokeColor = element.id === selectedElementId ? '#F7B84B' : '#333333';
+          fillColor = isSelected ? '#F5A623' : isHovered ? '#6a6a6a' : '#5a5a5a';
+          strokeColor = isSelected ? '#F7B84B' : isHovered ? '#777777' : '#333333';
           break;
         case ElementType.LightBand:
-          fillColor = element.id === selectedElementId ? '#F5A623' : '#e0e0e0';
-          strokeColor = element.id === selectedElementId ? '#F7B84B' : '#999999';
+          fillColor = isSelected ? '#F5A623' : isHovered ? '#f0f0f0' : '#e0e0e0';
+          strokeColor = isSelected ? '#F7B84B' : isHovered ? '#aaaaaa' : '#999999';
           break;
         default:
-          fillColor = element.id === selectedElementId ? '#F5A623' : '#aaccff';
-          strokeColor = element.id === selectedElementId ? '#F7B84B' : '#0066cc';
+          fillColor = isSelected ? '#F5A623' : isHovered ? '#b4d1ee' : '#aaccff';
+          strokeColor = isSelected ? '#F7B84B' : isHovered ? '#3387d6' : '#0066cc';
       }
       
       // Draw doors and windows with consistent proportions and detailed visualizations
@@ -488,6 +492,17 @@ const FacadeEditor: React.FC = () => {
         ctx.lineTo(x + width / 2, element.type.includes("Door") ? groundY : y);
         ctx.stroke();
       }
+      
+      // Add draggable indicator when hovered
+      if (isHovered && !isSelected) {
+        ctx.fillStyle = 'rgba(255,255,255,0.3)';
+        ctx.beginPath();
+        ctx.moveTo(x, y - height - 20);
+        ctx.lineTo(x - 8, y - height - 10);
+        ctx.lineTo(x + 8, y - height - 10);
+        ctx.closePath();
+        ctx.fill();
+      }
     });
     
     // Draw a scale legend
@@ -549,7 +564,7 @@ const FacadeEditor: React.FC = () => {
     ctx.stroke();
     ctx.fillText("Human: 1.8m", 95, groundY - humanHeight);
     
-  }, [activeWall, dimensions, elements, selectedElementId, wallElements, Y_OFFSET]);
+  }, [activeWall, dimensions, elements, selectedElementId, wallElements, Y_OFFSET, hoveredElementId]);
   
   // Update canvas when relevant state changes
   useEffect(() => {
@@ -571,14 +586,13 @@ const FacadeEditor: React.FC = () => {
     if (clickedElement) {
       selectElement(clickedElement.id);
       setIsDragging(true);
+      canvas.style.cursor = 'grabbing';
     } else {
       selectElement(null);
     }
   };
   
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDragging || !selectedElementId) return;
-    
     const canvas = canvasRef.current;
     if (!canvas) return;
     
@@ -586,64 +600,128 @@ const FacadeEditor: React.FC = () => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     
-    // Convert canvas position to 3D position
-    let wallWidth, wallHeight;
-    if (activeWall === WallType.North || activeWall === WallType.South) {
-      wallWidth = dimensions.length;
-      wallHeight = dimensions.height;
-    } else {
-      wallWidth = dimensions.width;
-      wallHeight = dimensions.height;
+    // If dragging, update element position
+    if (isDragging && selectedElementId) {
+      // Set dimensions based on wall
+      let wallWidth, wallHeight;
+      if (activeWall === WallType.North || activeWall === WallType.South) {
+        wallWidth = dimensions.length;
+        wallHeight = dimensions.height;
+      } else {
+        wallWidth = dimensions.width;
+        wallHeight = dimensions.height;
+      }
+      
+      const scaleX = canvas.width / wallWidth;
+      const scaleY = canvas.height / wallHeight;
+      
+      // Get the element to determine its height
+      const element = elements.find(el => el.id === selectedElementId);
+      if (!element) return;
+      
+      // Calculate new position based on wall
+      let newPosition = { ...element.position };
+      
+      if (activeWall === WallType.North) {
+        newPosition = {
+          x: (mouseX / scaleX) - (wallWidth / 2),
+          y: (canvas.height - mouseY) / scaleY, // Adjusted to remove Y_OFFSET
+          z: -dimensions.width / 2
+        };
+      } else if (activeWall === WallType.South) {
+        newPosition = {
+          x: (wallWidth / 2) - (mouseX / scaleX),
+          y: (canvas.height - mouseY) / scaleY,
+          z: dimensions.width / 2
+        };
+      } else if (activeWall === WallType.East) {
+        newPosition = {
+          x: dimensions.length / 2,
+          y: (canvas.height - mouseY) / scaleY,
+          z: (mouseX / scaleX) - (wallWidth / 2)
+        };
+      } else { // West
+        newPosition = {
+          x: -dimensions.length / 2,
+          y: (canvas.height - mouseY) / scaleY,
+          z: (wallWidth / 2) - (mouseX / scaleX)
+        };
+      }
+      
+      // Add grid snapping (snap to 0.5 meter increments when holding Shift)
+      if (e.shiftKey) {
+        newPosition.x = Math.round(newPosition.x * 2) / 2; // Snap to 0.5m grid
+        newPosition.y = Math.round(newPosition.y * 2) / 2; // Snap to 0.5m grid
+        if (activeWall === WallType.East || activeWall === WallType.West) {
+          newPosition.z = Math.round(newPosition.z * 2) / 2; // Snap Z for East/West walls
+        }
+      }
+      
+      // Ensure Y position is never below element's half-height (to keep it above ground)
+      newPosition.y = Math.max(element.dimensions.height / 2, newPosition.y);
+      
+      // Ensure the element is not placed too high
+      newPosition.y = Math.min(newPosition.y, dimensions.height - 0.1);
+      
+      // Update element position
+      updateElement(selectedElementId, { position: newPosition });
+    } 
+    // If not dragging, check for hover
+    else {
+      // Find element under cursor for hover effect
+      const elementUnderCursor = findElementAtPosition(mouseX, mouseY);
+      setHoveredElementId(elementUnderCursor ? elementUnderCursor.id : null);
+      
+      // Update cursor style based on whether we're over a draggable element
+      if (canvas) {
+        canvas.style.cursor = elementUnderCursor ? 'grab' : 'default';
+      }
     }
-    
-    const scaleX = canvas.width / wallWidth;
-    const scaleY = canvas.height / wallHeight;
-    
-    // Get the element to determine its height
-    const element = elements.find(el => el.id === selectedElementId);
-    if (!element) return;
-    
-    // Calculate new position based on wall
-    let newPosition = { ...element.position };
-    
-    if (activeWall === WallType.North) {
-      newPosition = {
-        x: (mouseX / scaleX) - (wallWidth / 2),
-        y: (canvas.height - mouseY) / scaleY, // Adjusted to remove Y_OFFSET
-        z: -dimensions.width / 2
-      };
-    } else if (activeWall === WallType.South) {
-      newPosition = {
-        x: (wallWidth / 2) - (mouseX / scaleX),
-        y: (canvas.height - mouseY) / scaleY,
-        z: dimensions.width / 2
-      };
-    } else if (activeWall === WallType.East) {
-      newPosition = {
-        x: dimensions.length / 2,
-        y: (canvas.height - mouseY) / scaleY,
-        z: (mouseX / scaleX) - (wallWidth / 2)
-      };
-    } else { // West
-      newPosition = {
-        x: -dimensions.length / 2,
-        y: (canvas.height - mouseY) / scaleY,
-        z: (wallWidth / 2) - (mouseX / scaleX)
-      };
+
+    // Update cursor during dragging
+    if (isDragging && canvas) {
+      canvas.style.cursor = 'grabbing';
     }
-    
-    // Ensure Y position is never below element's half-height (to keep it above ground)
-    newPosition.y = Math.max(element.dimensions.height / 2, newPosition.y);
-    
-    // Ensure the element is not placed too high
-    newPosition.y = Math.min(newPosition.y, dimensions.height - 0.1);
-    
-    // Update element position
-    updateElement(selectedElementId, { position: newPosition });
   };
   
   const handleMouseUp = () => {
     setIsDragging(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.style.cursor = 'default';
+    }
+  };
+
+  // Add the missing handleMouseLeave function
+  const handleMouseLeave = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Don't immediately cancel drag, user might move mouse back in
+    if (isDragging && selectedElementId) {
+      // Keep dragging mode for a short period in case the user's mouse
+      // briefly exits and then re-enters the canvas
+      setTimeout(() => {
+        if (!canvasRef.current?.contains(document.activeElement)) {
+          setIsDragging(false);
+        }
+      }, 250);
+    }
+    
+    // Clear hover state when mouse leaves
+    setHoveredElementId(null);
+    
+    // Reset cursor
+    const canvas = canvasRef.current;
+    if (canvas) {
+      canvas.style.cursor = 'default';
+    }
+  };
+  
+  // Add a proper mouse enter handler too for better interaction
+  const handleMouseEnter = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // If mouse re-enters while dragging, keep the dragging state
+    const canvas = canvasRef.current;
+    if (canvas && isDragging) {
+      canvas.style.cursor = 'grabbing';
+    }
   };
   
   // Helper function to find element at mouse position
@@ -665,41 +743,81 @@ const FacadeEditor: React.FC = () => {
     const scaleX = canvas.width / wallWidth;
     const scaleY = canvas.height / wallHeight;
     
-    // Check each element
+    // Define selection margin to make elements easier to click (in pixels)
+    const SELECTION_MARGIN = 10;
+    
+    // Keep track of all elements that the mouse might be over
+    const candidateElements = [];
+    
+    // Check each element with a more generous hit area
     for (const element of wallElements) {
       // Convert 3D position to 2D facade position
       let elementX, elementY;
       
       if (activeWall === WallType.North) {
         elementX = (element.position.x + wallWidth / 2) * scaleX;
-        elementY = canvas.height - ((element.position.y + Y_OFFSET) * scaleY);
+        elementY = canvas.height - (element.position.y * scaleY);
       } else if (activeWall === WallType.South) {
         elementX = (wallWidth / 2 - element.position.x) * scaleX;
-        elementY = canvas.height - ((element.position.y + Y_OFFSET) * scaleY);
+        elementY = canvas.height - (element.position.y * scaleY);
       } else if (activeWall === WallType.East) {
         elementX = (element.position.z + wallWidth / 2) * scaleX;
-        elementY = canvas.height - ((element.position.y + Y_OFFSET) * scaleY);
+        elementY = canvas.height - (element.position.y * scaleY);
       } else { // West
         elementX = (wallWidth / 2 - element.position.z) * scaleX;
-        elementY = canvas.height - ((element.position.y + Y_OFFSET) * scaleY);
+        elementY = canvas.height - (element.position.y * scaleY);
       }
       
       // Element dimensions
       const width = element.dimensions.width * scaleX;
       const height = element.dimensions.height * scaleY;
       
-      // Check if mouse is inside element
+      // For doors, we need to check against their actual drawing position (bottom at ground)
+      let checkY, checkHeight;
+      if (element.type === ElementType.Door || 
+          element.type === ElementType.SectionalDoor || 
+          element.type === ElementType.WindowedSectionalDoor) {
+        
+        // Doors are drawn from ground up
+        checkY = canvas.height; // Ground level
+        checkHeight = element.dimensions.height * scaleY;
+      } else {
+        // Other elements are drawn centered
+        checkY = elementY;
+        checkHeight = height;
+      }
+      
+      // Check with additional margin
       if (
-        x >= elementX - width / 2 &&
-        x <= elementX + width / 2 &&
-        y >= elementY - height &&
-        y <= elementY
+        x >= elementX - width / 2 - SELECTION_MARGIN &&
+        x <= elementX + width / 2 + SELECTION_MARGIN &&
+        y >= checkY - checkHeight - SELECTION_MARGIN &&
+        y <= checkY + SELECTION_MARGIN
       ) {
-        return element;
+        // Element is a candidate - track its size and distance from mouse center
+        const centerX = elementX;
+        const centerY = checkY - checkHeight / 2;
+        const distance = Math.sqrt(Math.pow(x - centerX, 2) + Math.pow(y - centerY, 2));
+        
+        candidateElements.push({
+          element,
+          distance,
+          area: width * height // Store area to prioritize smaller elements when overlapping
+        });
       }
     }
     
-    return null;
+    // Sort by distance and area (prefer closer and smaller elements)
+    candidateElements.sort((a, b) => {
+      // If elements are roughly the same distance, prefer smaller one
+      if (Math.abs(a.distance - b.distance) < 20) {
+        return a.area - b.area;
+      }
+      // Otherwise prefer closer one
+      return a.distance - b.distance;
+    });
+    
+    return candidateElements.length > 0 ? candidateElements[0].element : null;
   };
 
   // Find a suitable position for a new element to avoid overlapping
@@ -1031,7 +1149,8 @@ const FacadeEditor: React.FC = () => {
               onMouseDown={handleMouseDown}
               onMouseMove={handleMouseMove}
               onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
+              onMouseLeave={handleMouseLeave}
+              onMouseEnter={handleMouseEnter}
               className="cursor-move"
             />
           </div>
