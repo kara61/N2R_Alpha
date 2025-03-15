@@ -222,7 +222,7 @@ const MonopitchRoofBuilding: React.FC<MonopitchRoofBuildingProps> = ({
   // Use a stable dependency array for useMemo
   }, [length, width, height, roofHeight, northMaterial, southMaterial, sideMaterial, wallThickness]);
   
-  // Create roof with adjusted renderOrder
+  // Create roof with adjusted renderOrder and slightly wider to avoid gaps
   const roof = useMemo(() => {
     return (
       <mesh 
@@ -232,10 +232,9 @@ const MonopitchRoofBuilding: React.FC<MonopitchRoofBuildingProps> = ({
         material={roofMaterial}
         renderOrder={2} // Render after walls to prevent Z-fighting
       >
-        <boxGeometry args={[length + 0.1, 0.1, roofLength + 0.1]} />
+        <boxGeometry args={[length + 0.2, 0.1, roofLength + 0.2]} /> // Slightly wider to avoid edge gaps
       </mesh>
     );
-  // Use a stable dependency array
   }, [length, height, roofHeight, roofLength, angle, roofMaterial]);
   
   return (
@@ -249,7 +248,7 @@ const MonopitchRoofBuilding: React.FC<MonopitchRoofBuildingProps> = ({
         roofType={RoofType.Monopitch}
         roofHeight={roofHeight}
         gutterMaterial={gutterMaterial} 
-        renderOrder={3} // Render gutters last
+        renderOrder={4} // Increased renderOrder to ensure it renders after everything else
       />
       <Foundation 
         length={length} 
