@@ -9,8 +9,8 @@ import {
   BuildingStats,
   ElementType,
   WallType,
-  RoofElement,
-  RoofElementType
+  RoofElement
+  // Removed RoofElementType since it's unused
 } from '../types';
 
 interface BuildingState {
@@ -53,43 +53,43 @@ interface BuildingState {
 }
 
 // Default materials
-const defaultMaterials = {
-  glass: {
-    id: 'glass',
-    name: 'Glass',
-    color: '#a3c6e8',
-    roughness: 0.1,
-    metalness: 0.9,
-  },
-  metal: {
-    id: 'metal',
-    name: 'Metal',
-    color: '#b0b0b0',
-    roughness: 0.5,
-    metalness: 0.8,
-  },
-  door: {
-    id: 'door',
-    name: 'Door',
-    color: '#4a4a4a',
-    roughness: 0.7,
-    metalness: 0.3,
-  },
-  lightBand: {
-    id: 'lightBand',
-    name: 'Light Band',
-    color: '#e0e0e0',
-    roughness: 0.2,
-    metalness: 0.1,
-  },
-  polycarbonate: {
-    id: 'polycarbonate',
-    name: 'Polycarbonate',
-    color: '#d4f1f9',
-    roughness: 0.2,
-    metalness: 0.1,
-  }
-};
+// const defaultMaterials = {
+//   glass: {
+//     id: 'glass',
+//     name: 'Glass',
+//     color: '#a3c6e8',
+//     roughness: 0.1,
+//     metalness: 0.9,
+//   },
+//   metal: {
+//     id: 'metal',
+//     name: 'Metal',
+//     color: '#b0b0b0',
+//     roughness: 0.5,
+//     metalness: 0.8,
+//   },
+//   door: {
+//     id: 'door',
+//     name: 'Door',
+//     color: '#4a4a4a',
+//     roughness: 0.7,
+//     metalness: 0.3,
+//   },
+//   lightBand: {
+//     id: 'lightBand',
+//     name: 'Light Band',
+//     color: '#e0e0e0',
+//     roughness: 0.2,
+//     metalness: 0.1,
+//   },
+//   polycarbonate: {
+//     id: 'polycarbonate',
+//     name: 'Polycarbonate',
+//     color: '#d4f1f9',
+//     roughness: 0.2,
+//     metalness: 0.1,
+//   }
+// };
 
 export const useBuildingStore = create<BuildingState>((set, get) => ({
   dimensions: {

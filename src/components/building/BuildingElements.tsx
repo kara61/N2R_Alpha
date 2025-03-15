@@ -151,8 +151,8 @@ const BuildingElements: React.FC<BuildingElementsProps> = ({ elements, dimension
                 </mesh>
                 
                 {/* Door handle */}
-                <mesh position={[elementDim.width / 3, 0, 0.05]} material={new THREE.MeshStandardMaterial({ color: '#aaaaaa', metalness: 0.9 })}>
-                  <cylinderGeometry args={[0.02, 0.02, 0.15, 8]} rotation={[Math.PI / 2, 0, 0]} />
+                <mesh position={[elementDim.width / 3, 0, 0.05]} rotation={[Math.PI / 2, 0, 0]} material={new THREE.MeshStandardMaterial({ color: '#aaaaaa', metalness: 0.9 })}>
+                  <cylinderGeometry args={[0.02, 0.02, 0.15, 8]} />
                 </mesh>
               </group>
             );

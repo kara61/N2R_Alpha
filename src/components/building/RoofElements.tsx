@@ -13,11 +13,9 @@ interface RoofElementsProps {
 
 const RoofElements: React.FC<RoofElementsProps> = ({ 
   roofElements, 
-  buildingLength, 
   buildingWidth, 
-  buildingHeight,
-  roofType,
   roofPitch
+  // Other props are intentionally removed as they're unused
 }) => {
   // Create materials
   const polycarbonateMaterial = useMemo(() => {
@@ -33,13 +31,17 @@ const RoofElements: React.FC<RoofElementsProps> = ({
     });
   }, []);
 
-  // Calculate roof height based on pitch percentage
-  const roofHeight = buildingWidth * (roofPitch / 100);
+  // This value isn't used in the component but kept for potential future use
+  // const roofHeight = buildingWidth * (roofPitch / 100);
   
   return (
     <group>
       {roofElements.map(element => {
         const { id, type, position, rotation, dimensions } = element;
+        
+        // For determining cylinder orientation
+        const isRidgeSkylight = type === RoofElementType.RidgeSkylights;
+        const cylinderLength = isRidgeSkylight ? dimensions.length || 1 : dimensions.width;
         
         // Create a half-cylinder skylight
         return (
@@ -48,23 +50,25 @@ const RoofElements: React.FC<RoofElementsProps> = ({
             position={[position.x, position.y, position.z]}
             rotation={[rotation.x, rotation.y, rotation.z]}
           >
-            {/* Half-cylinder dome */}
-            <mesh material={polycarbonateMaterial}>
+            {/* Half-cylinder dome - fix rotation by applying it to the group instead */}
+            <mesh 
+              material={polycarbonateMaterial}
+              rotation={[
+                isRidgeSkylight ? 0 : Math.PI/2, 
+                isRidgeSkylight ? Math.PI/2 : 0, 
+                0
+              ]}
+            >
               <cylinderGeometry 
                 args={[
                   dimensions.width / 2, 
                   dimensions.width / 2, 
-                  type === RoofElementType.RidgeSkylights ? dimensions.length || 1 : dimensions.width, 
+                  cylinderLength, 
                   32, 
                   1, 
                   false, 
                   0, 
                   Math.PI
-                ]} 
-                rotation={[
-                  type === RoofElementType.RidgeSkylights ? 0 : Math.PI/2, 
-                  type === RoofElementType.RidgeSkylights ? Math.PI/2 : 0, 
-                  0
                 ]} 
               />
             </mesh>

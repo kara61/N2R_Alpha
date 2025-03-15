@@ -82,8 +82,7 @@ const Building: React.FC = () => {
             width={dimensions.width}
             height={dimensions.height}
             roofPitch={dimensions.roofPitch}
-            northSouthMaterial={northSouthMaterial}
-            eastWestMaterial={eastWestMaterial}
+            claddingMaterial={northSouthMaterial} 
             roofMaterial={roofMaterial}
             concreteMaterial={concreteMaterial}
             gutterMaterial={gutterMaterial}
