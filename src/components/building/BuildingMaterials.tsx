@@ -572,48 +572,6 @@ function createAoMap(isTrapezoid: boolean): HTMLCanvasElement {
   return canvas;
 }
 
-// Create a texture specifically for extruded geometries
-const createExtrudedGeometryTexture = (color: string): THREE.Texture => {
-  const canvas = document.createElement('canvas');
-  const size = 512; // Larger texture for more detail
-  canvas.width = size;
-  canvas.height = size;
-  
-  const ctx = canvas.getContext('2d');
-  if (!ctx) return new THREE.Texture();
-  
-  // Fill background with base color
-  ctx.fillStyle = color;
-  ctx.fillRect(0, 0, size, size);
-  
-  // Create a grid pattern that will be visible regardless of UV mapping
-  const gridSize = size / 2; // 8x8 grid
-  ctx.lineWidth = 5;
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
-  
-  // Draw vertical lines
-  for (let x = 0; x <= size; x += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(x, 0);
-    ctx.lineTo(x, size);
-    ctx.stroke();
-  }
-  
-  // Draw horizontal lines
-  for (let y = 0; y <= size; y += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(size, y);
-    ctx.stroke();
-  }
-  
-  // Create texture from canvas
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = THREE.RepeatWrapping;
-  texture.wrapT = THREE.RepeatWrapping;
-  return texture;
-};
-
 export const useMonopitchWallMaterials = (
   claddingType: CladdingType, 
   facadeColor: RalColor | undefined,
@@ -645,54 +603,53 @@ export const useMonopitchWallMaterials = (
     
     const isTrapezoid = claddingType === CladdingType.TrapezoidSheet;
     
-    // IMPORTANT: Create textures EXACTLY as in the useBuildingMaterials function
-    // Create texture for walls - with TRUE for isRoof to match standard materials
-    const northTexture = isTrapezoid 
-      ? createTrapezoidTexture(colorHex, true)  // Use TRUE to match standard materials
-      : createPanelTexture(colorHex, true);     // Use TRUE to match standard materials
+    // NORTH/SOUTH WALLS - Use the same scaling as standard materials
+    const northSouthTexture = isTrapezoid 
+      ? createTrapezoidTexture(colorHex, true)
+      : createPanelTexture(colorHex, true);
     
-    // Create normal map with same parameters as standard materials
-    const northNormalMap = createNormalMap(true, isTrapezoid);
+    // Create normal map
+    const northSouthNormalMap = createNormalMap(true, isTrapezoid);
     
-    // Apply standard texture settings from useBuildingMaterials
-    northTexture.wrapS = northTexture.wrapT = THREE.RepeatWrapping;
-    northTexture.repeat.set(10, 0);  // Use constant 10, 0 to match standard materials
-    northNormalMap.repeat.set(1, 1);
+    // EXACT SAME settings as standard northSouthMaterial
+    northSouthTexture.wrapS = northSouthTexture.wrapT = THREE.RepeatWrapping;
+    northSouthTexture.repeat.set(10, 0);  // MATCH the standard north/south walls
+    northSouthNormalMap.repeat.set(1, 1);
     
-    // Create a proper south texture that's identical to standard materials
-    const southTexture = northTexture.clone();
+    // EAST/WEST WALLS - Create a different texture instance with different scaling
+    const eastWestTexture = isTrapezoid 
+      ? createTrapezoidTexture(colorHex, true)
+      : createPanelTexture(colorHex, true);
     
-    // Create materials with consistent parameters including normal maps
-    const northMaterial = new THREE.MeshStandardMaterial({
-      color: colorHex,
-      metalness: metalnessValues[claddingType],
+    // Create another normal map for east/west
+    const eastWestNormalMap = createNormalMap(true, isTrapezoid);
+    
+    // EXACT SAME settings as standard eastWestMaterial
+    eastWestTexture.wrapS = eastWestTexture.wrapT = THREE.RepeatWrapping;
+    eastWestTexture.repeat.set(1, 0);  // MATCH the standard east/west walls
+    eastWestNormalMap.repeat.set(1, 1);
+    
+    // Create materials
+    const northMaterial = new THREE.MeshStandardMaterial({ 
+      color: colorHex, 
+      metalness: metalnessValues[claddingType], 
       roughness: roughnessValues[claddingType],
-      map: northTexture,
-      normalMap: northNormalMap,
+      map: northSouthTexture,
+      normalMap: northSouthNormalMap,
       normalScale: new THREE.Vector2(0.1, 0.1),
-      side: THREE.DoubleSide,
+      side: THREE.DoubleSide
     });
     
-    const southMaterial = new THREE.MeshStandardMaterial({
-      color: colorHex,
-      metalness: metalnessValues[claddingType],
-      roughness: roughnessValues[claddingType],
-      map: southTexture,
-      normalMap: northNormalMap,
-      normalScale: new THREE.Vector2(0.1, 0.1),
-      side: THREE.DoubleSide,
-    });
+    const southMaterial = northMaterial.clone();
     
-    // Get specialized side wall texture - keep this for extruded geometry
-    const extrudedWallTexture = createExtrudedGeometryTexture(colorHex);
-    
-    // East/West material
     const eastWestMaterial = new THREE.MeshStandardMaterial({
       color: colorHex,
-      metalness: 0.2,
-      roughness: 0.7, 
-      map: extrudedWallTexture,
-      side: THREE.DoubleSide,
+      metalness: metalnessValues[claddingType],
+      roughness: roughnessValues[claddingType],
+      map: eastWestTexture,
+      normalMap: eastWestNormalMap,
+      normalScale: new THREE.Vector2(0.1, 0.1),
+      side: THREE.DoubleSide
     });
 
     return {

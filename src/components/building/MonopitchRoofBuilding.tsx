@@ -82,44 +82,36 @@ const MonopitchRoofBuilding: React.FC<MonopitchRoofBuildingProps> = ({
       </mesh>
     );
     
-    // Create shape for the trapezoid walls
-    // Create points for left/right trapezoid walls
-    const points = [
-      new THREE.Vector3(-width/2, 0, 0),           // Bottom front
-      new THREE.Vector3(width/2, 0, 0),            // Bottom back
-      new THREE.Vector3(width/2, height, 0),       // Top back
-      new THREE.Vector3(-width/2, height + roofHeight, 0) // Top front with roof slope
-    ];
+    // COMPLETELY SEPARATE CONFIGURATIONS FOR SIDE WALLS
     
-    // Create shape for the trapezoid
-    const sideShape = new THREE.Shape();
-    sideShape.moveTo(points[0].x, points[0].y);
-    sideShape.lineTo(points[1].x, points[1].y);
-    sideShape.lineTo(points[2].x, points[2].y);
-    sideShape.lineTo(points[3].x, points[3].y);
-    sideShape.lineTo(points[0].x, points[0].y);
+    // EAST WALL (LEFT) SHAPE - REVERSED slope direction
+    const eastWallShape = new THREE.Shape();
     
-    // Create shape for the right wall (needs to be defined before use)
-    const rightShape = new THREE.Shape();
-    rightShape.moveTo(-width/2, 0);           // Bottom front
-    rightShape.lineTo(width/2, 0);            // Bottom back
-    rightShape.lineTo(width/2, height + roofHeight); // Top back with roof slope
-    rightShape.lineTo(-width/2, height);      // Top front 
-    rightShape.lineTo(-width/2, 0);           // Close path
+    // Define points explicitly in counter-clockwise order with REVERSED slope
+    eastWallShape.moveTo(-width/2, 0);                  // Bottom North
+    eastWallShape.lineTo(width/2, 0);                   // Bottom South
+    eastWallShape.lineTo(width/2, height);              // Top South (normal height) - CHANGED
+    eastWallShape.lineTo(-width/2, height + roofHeight); // Top North (higher due to roof) - CHANGED
+    eastWallShape.lineTo(-width/2, 0);                  // Back to start
     
-    // Extrusion settings
-    const extrudeSettings = {
-      steps: 1,
-      depth: wallThickness,
-      bevelEnabled: false
-    };
+    // WEST WALL (RIGHT) SHAPE - REVERSED slope direction
+    const westWallShape = new THREE.Shape();
     
-    // Side walls still need shader compilation for texture mapping on the trapezoid shapes
-    const leftWall = (
+    // Define points explicitly in counter-clockwise order with REVERSED slope
+    westWallShape.moveTo(-width/2, 0);                  // Bottom South (when rotated)
+    westWallShape.lineTo(width/2, 0);                   // Bottom North (when rotated)
+    westWallShape.lineTo(width/2, height + roofHeight); // Top North with slope (when rotated) - CHANGED
+    westWallShape.lineTo(-width/2, height);             // Top South (normal height) - CHANGED
+    westWallShape.lineTo(-width/2, 0);                  // Back to start
+    
+    const extrudeSettings = { depth: wallThickness, bevelEnabled: false };
+    
+    // EAST WALL (LEFT) - Completely custom configuration
+    const eastWall = (
       <mesh 
-        key="wall-left-gable" 
-        position={[-length / 2, 0, 0]} 
-        rotation={[0, Math.PI / 2, 0]} 
+        key="wall-east" 
+        position={[-length/2, 0, 0]} 
+        rotation={[0, Math.PI/2, 0]} 
         material={sideMaterial}
         onBeforeCompile={(shader) => {
           // Calculate number of 1m panels needed for width - EXACT copy from GableRoofBuilding
@@ -147,19 +139,19 @@ const MonopitchRoofBuilding: React.FC<MonopitchRoofBuildingProps> = ({
           `;
         }}
       >
-        <extrudeGeometry args={[sideShape, extrudeSettings]} />
+        <extrudeGeometry args={[eastWallShape, extrudeSettings]} />
       </mesh>
     );
     
-    // RIGHT WALL (WEST) - EXACT COPY from GableRoofBuilding
-    const rightWall = (
+    // WEST WALL (RIGHT) - Completely custom configuration
+    const westWall = (
       <mesh 
-        key="wall-right-gable" 
-        position={[length/2 + wallThickness/2, 0, 0]} 
+        key="wall-west" 
+        position={[length/2, 0, 0]} 
         rotation={[0, -Math.PI/2, 0]} 
         material={sideMaterial}
         onBeforeCompile={(shader) => {
-          // Calculate number of 1m panels needed for width
+          // Calculate number of 1m panels needed for width - EXACT copy from GableRoofBuilding
           const panelsWide = Math.ceil(width);
           const gableHeight = height + roofHeight;
           
@@ -184,7 +176,7 @@ const MonopitchRoofBuilding: React.FC<MonopitchRoofBuildingProps> = ({
           `;
         }}
       >
-        <extrudeGeometry args={[rightShape, extrudeSettings]} />
+        <extrudeGeometry args={[westWallShape, extrudeSettings]} />
       </mesh>
     );
     
@@ -220,8 +212,8 @@ const MonopitchRoofBuilding: React.FC<MonopitchRoofBuildingProps> = ({
     return [
       frontWall, 
       backWall, 
-      leftWall, 
-      rightWall, 
+      eastWall,  // Note: renamed from leftWall
+      westWall,  // Note: renamed from rightWall
       leftBackTop, 
       rightBackTop, 
       leftFrontTop, 
