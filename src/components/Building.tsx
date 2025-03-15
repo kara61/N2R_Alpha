@@ -86,6 +86,9 @@ const Building: React.FC = () => {
             roofMaterial={roofMaterial}
             concreteMaterial={concreteMaterial}
             gutterMaterial={gutterMaterial}
+            // Pass additional props for texture scaling
+            facadeColor={facadeColor}
+            claddingType={claddingType}
           />
         );
       default:

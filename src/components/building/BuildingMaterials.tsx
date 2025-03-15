@@ -43,7 +43,8 @@ const createPanelTexture = (color: string, isRoof: boolean = false): THREE.Textu
   
   // For roof, draw vertical lines (rotated 90 degrees from original)
   // For walls, draw horizontal lines (changed from vertical to match roof scale)
-  const direction = isRoof ? 'vertical' : 'horizontal';
+  // Swap the orientation to rotate by 90 degrees
+  const direction = isRoof ? 'horizontal' : 'vertical';
   
   if (direction === 'horizontal') {
     for (let y = 0; y < size; y += lineSpacing) {
@@ -128,7 +129,8 @@ const createTrapezoidTexture = (color: string, isRoof: boolean = false): THREE.T
   const ridgeWidth = 16;
   
   // Direction based on roof or wall - rotated 90 degrees for roof
-  const direction = isRoof ? 'vertical' : 'horizontal';
+  // Swap the orientation to rotate by 90 degrees
+  const direction = isRoof ? 'horizontal' : 'vertical';
   
   if (direction === 'horizontal') {
     for (let y = 0; y < size; y += ridgeSpacing) {
@@ -451,4 +453,252 @@ export const useBuildingMaterials = (
     concreteMaterial,
     gutterMaterial
   };
+};
+
+// Add this function to create and return textures for different cladding types
+const getCladdingTexture = (claddingType: CladdingType) => {
+  const facadeHex = '#E7EBDA'; // Default color - will be overridden in the material
+  
+  const isTrapezoid = claddingType === CladdingType.TrapezoidSheet;
+  
+  // Create diffuse texture based on cladding type
+  const map = isTrapezoid
+    ? createTrapezoidTexture(facadeHex)
+    : createPanelTexture(facadeHex);
+  
+  // Create normal map
+  const normalMap = createNormalMap(false, isTrapezoid);
+  
+  // Create roughness map
+  const roughnessMap = new THREE.CanvasTexture(createRoughnessMap(isTrapezoid));
+  roughnessMap.wrapS = roughnessMap.wrapT = THREE.RepeatWrapping;
+  
+  // Create AO map
+  const aoMap = new THREE.CanvasTexture(createAoMap(isTrapezoid));
+  aoMap.wrapS = aoMap.wrapT = THREE.RepeatWrapping;
+  
+  return {
+    map,
+    normalMap,
+    roughnessMap,
+    aoMap
+  };
+};
+
+// Function to create roughness map
+function createRoughnessMap(isTrapezoid: boolean): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  const size = 256;
+  canvas.width = size;
+  canvas.height = size;
+  
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  
+  // Fill with base roughness value
+  ctx.fillStyle = '#808080'; // 50% roughness
+  ctx.fillRect(0, 0, size, size);
+  
+  if (isTrapezoid) {
+    // Add roughness variation for trapezoid ridges
+    const ridgeSpacing = 32;
+    
+    for (let y = 0; y < size; y += ridgeSpacing) {
+      // Ridge tops are smoother
+      ctx.fillStyle = '#606060'; // 38% roughness
+      ctx.fillRect(0, y, size, 8);
+      
+      // Ridge valleys are rougher
+      ctx.fillStyle = '#a0a0a0'; // 63% roughness
+      ctx.fillRect(0, y + 16, size, 8);
+    }
+  } else {
+    // Add roughness variation for panel seams
+    const seams = size / 2;
+    
+    for (let y = 0; y < size; y += seams) {
+      // Seams are rougher
+      ctx.fillStyle = '#909090'; // 56% roughness
+      ctx.fillRect(0, y, size, 4);
+    }
+    
+    // Add some random roughness variation
+    for (let i = 0; i < 1000; i++) {
+      const x = Math.random() * size;
+      const y = Math.random() * size;
+      const gray = 120 + Math.floor(Math.random() * 40);
+      ctx.fillStyle = `rgb(${gray},${gray},${gray})`;
+      ctx.fillRect(x, y, 2, 2);
+    }
+  }
+  
+  return canvas;
+}
+
+// Function to create ambient occlusion map
+function createAoMap(isTrapezoid: boolean): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  const size = 256;
+  canvas.width = size;
+  canvas.height = size;
+  
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  
+  // Fill with base white (no occlusion)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, size, size);
+  
+  if (isTrapezoid) {
+    // Add occlusion for trapezoid valleys
+    const ridgeSpacing = 32;
+    
+    for (let y = 0; y < size; y += ridgeSpacing) {
+      // Valleys have more occlusion
+      ctx.fillStyle = '#e0e0e0'; // 88% white
+      ctx.fillRect(0, y + 20, size, 12);
+    }
+  } else {
+    // Add occlusion for panel seams
+    const seams = size / 2;
+    
+    for (let y = 0; y < size; y += seams) {
+      // Seams have more occlusion
+      ctx.fillStyle = '#e8e8e8'; // 91% white
+      ctx.fillRect(0, y, 3, size);
+    }
+  }
+  
+  return canvas;
+}
+
+// Create a texture specifically for extruded geometries
+const createExtrudedGeometryTexture = (color: string): THREE.Texture => {
+  const canvas = document.createElement('canvas');
+  const size = 512; // Larger texture for more detail
+  canvas.width = size;
+  canvas.height = size;
+  
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return new THREE.Texture();
+  
+  // Fill background with base color
+  ctx.fillStyle = color;
+  ctx.fillRect(0, 0, size, size);
+  
+  // Create a grid pattern that will be visible regardless of UV mapping
+  const gridSize = size / 2; // 8x8 grid
+  ctx.lineWidth = 5;
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+  
+  // Draw vertical lines
+  for (let x = 0; x <= size; x += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, size);
+    ctx.stroke();
+  }
+  
+  // Draw horizontal lines
+  for (let y = 0; y <= size; y += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    ctx.lineTo(size, y);
+    ctx.stroke();
+  }
+  
+  // Create texture from canvas
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  return texture;
+};
+
+export const useMonopitchWallMaterials = (
+  claddingType: CladdingType, 
+  facadeColor: RalColor | undefined,
+  dimensions: { length: number, width: number, height: number, roofPitch: number }
+) => {
+  return useMemo(() => {
+    if (!facadeColor) {
+      throw new Error("Facade color is required for monopitch materials");
+    }
+    
+    const { length, width, height, roofPitch } = dimensions;
+    const roofHeight = width * (roofPitch / 100);
+    const colorHex = facadeColor.hex;
+    
+    // Material properties - EXACTLY match standard materials
+    const roughnessValues = {
+      'trapezoid': 0.6,
+      'sandwich60': 0.5,
+      'sandwich80': 0.5,
+      'sandwich100': 0.5,
+    };
+    
+    const metalnessValues = {
+      'trapezoid': 0.4,
+      'sandwich60': 0.2,
+      'sandwich80': 0.2,
+      'sandwich100': 0.2,
+    };
+    
+    const isTrapezoid = claddingType === CladdingType.TrapezoidSheet;
+    
+    // IMPORTANT: Create textures EXACTLY as in the useBuildingMaterials function
+    // Create texture for walls - with TRUE for isRoof to match standard materials
+    const northTexture = isTrapezoid 
+      ? createTrapezoidTexture(colorHex, true)  // Use TRUE to match standard materials
+      : createPanelTexture(colorHex, true);     // Use TRUE to match standard materials
+    
+    // Create normal map with same parameters as standard materials
+    const northNormalMap = createNormalMap(true, isTrapezoid);
+    
+    // Apply standard texture settings from useBuildingMaterials
+    northTexture.wrapS = northTexture.wrapT = THREE.RepeatWrapping;
+    northTexture.repeat.set(10, 0);  // Use constant 10, 0 to match standard materials
+    northNormalMap.repeat.set(1, 1);
+    
+    // Create a proper south texture that's identical to standard materials
+    const southTexture = northTexture.clone();
+    
+    // Create materials with consistent parameters including normal maps
+    const northMaterial = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      metalness: metalnessValues[claddingType],
+      roughness: roughnessValues[claddingType],
+      map: northTexture,
+      normalMap: northNormalMap,
+      normalScale: new THREE.Vector2(0.1, 0.1),
+      side: THREE.DoubleSide,
+    });
+    
+    const southMaterial = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      metalness: metalnessValues[claddingType],
+      roughness: roughnessValues[claddingType],
+      map: southTexture,
+      normalMap: northNormalMap,
+      normalScale: new THREE.Vector2(0.1, 0.1),
+      side: THREE.DoubleSide,
+    });
+    
+    // Get specialized side wall texture - keep this for extruded geometry
+    const extrudedWallTexture = createExtrudedGeometryTexture(colorHex);
+    
+    // East/West material
+    const eastWestMaterial = new THREE.MeshStandardMaterial({
+      color: colorHex,
+      metalness: 0.2,
+      roughness: 0.7, 
+      map: extrudedWallTexture,
+      side: THREE.DoubleSide,
+    });
+
+    return {
+      northMaterial,
+      southMaterial,
+      eastWestMaterial
+    };
+  }, [claddingType, facadeColor, dimensions]);
 };
