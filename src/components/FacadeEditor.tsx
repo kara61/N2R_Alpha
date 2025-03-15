@@ -44,8 +44,12 @@ const FacadeEditor: React.FC = () => {
       wallHeight = dimensions.height;
     }
     
-    // Calculate aspect ratio
-    const wallRatio = wallWidth / wallHeight;
+    // We only want to show exactly the building height (no extra space)
+    // We'll use a fixed Y offset so the ground is at the bottom of the canvas
+    const effectiveHeight = wallHeight;
+    
+    // Calculate aspect ratio using the actual wall dimensions
+    const wallRatio = wallWidth / effectiveHeight;
     const containerRatio = containerWidth / containerHeight;
     
     let canvasWidth, canvasHeight;
@@ -120,46 +124,96 @@ const FacadeEditor: React.FC = () => {
       wallHeight = dimensions.height;
     }
     
-    // Scale factors
+    // FIXED: We're now showing exactly the building height
+    // Remove the Y_OFFSET from the canvas scaling so that the ground is exactly at the bottom
     const scaleX = canvas.width / wallWidth;
-    const scaleY = canvas.height / wallHeight;
+    const scaleY = canvas.height / wallHeight; // The canvas height now represents exactly the building height
     
-    // Draw wall - industrial style with darker background
+    // Draw wall background with exact building dimensions
     ctx.fillStyle = '#2B3A42';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     
-    // Draw blueprint grid
+    // Draw scale reference - 1 meter grid
     ctx.strokeStyle = '#3A4A52';
     ctx.lineWidth = 0.5;
     
-    // Vertical grid lines (every meter)
+    // Add scale reference text every 5 meters horizontally
+    ctx.fillStyle = '#6B8A92';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    
+    // Vertical grid lines with measurement labels (every meter)
     for (let x = 0; x <= wallWidth; x++) {
       const canvasX = x * scaleX;
       ctx.beginPath();
       ctx.moveTo(canvasX, 0);
       ctx.lineTo(canvasX, canvas.height);
       ctx.stroke();
+      
+      // Add labels every 5m
+      if (x % 5 === 0) {
+        ctx.fillText(`${x}m`, canvasX, canvas.height - 5);
+      }
     }
     
-    // Horizontal grid lines (every meter)
+    // Horizontal grid lines - FIXED to match building height precisely
     for (let y = 0; y <= wallHeight; y++) {
-      const canvasY = canvas.height - ((y + Y_OFFSET) * scaleY);
+      // The Y position is calculated from the bottom (ground level)
+      const canvasY = canvas.height - (y * scaleY);
       ctx.beginPath();
       ctx.moveTo(0, canvasY);
       ctx.lineTo(canvas.width, canvasY);
       ctx.stroke();
+      
+      // Add height labels every meter
+      if (y % 1 === 0) {
+        ctx.fillStyle = '#6B8A92';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'left';
+        ctx.fillText(`${y}m`, 5, canvasY - 2);
+      }
     }
     
-    // Draw ground line with stronger emphasis
-    const groundY = canvas.height - (Y_OFFSET * scaleY);
+    // FIXED: Draw ground line at the bottom of the canvas exactly
+    const groundY = canvas.height; // Ground is exactly at canvas.height now
     ctx.strokeStyle = '#F5A623';
     ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(0, groundY);
     ctx.lineTo(canvas.width, groundY);
     ctx.stroke();
+
+    // Add visual scale indicator - human figure for reference (1.8m tall)
+    const humanHeight = 1.8 * scaleY; // 1.8 meters tall
+    const humanX = 40;
     
-    // Draw structural elements (columns)
+    // Draw simple human figure silhouette
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    // Head
+    ctx.beginPath();
+    ctx.arc(humanX, groundY - humanHeight + 15, 15, 0, Math.PI * 2);
+    ctx.fill();
+    // Body
+    ctx.beginPath();
+    ctx.moveTo(humanX, groundY - humanHeight + 30);
+    ctx.lineTo(humanX, groundY - 50);
+    ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+    ctx.lineWidth = 4;
+    ctx.stroke();
+    // Legs
+    ctx.beginPath();
+    ctx.moveTo(humanX, groundY - 50);
+    ctx.lineTo(humanX - 10, groundY);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(humanX, groundY - 50);
+    ctx.lineTo(humanX + 10, groundY);
+    ctx.stroke();
+    // Label
+    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    ctx.fillText('1.8m', humanX, groundY - humanHeight / 2);
+    
+    // Draw structural columns
     const maxColumnSpacing = 5; // Maximum 5m between columns
     const columnsLength = Math.max(2, Math.ceil(wallWidth / maxColumnSpacing));
     const actualSpacing = wallWidth / (columnsLength - 1);
@@ -190,26 +244,27 @@ const FacadeEditor: React.FC = () => {
       }
     }
     
-    // Draw elements
+    // Draw elements with proper proportional sizing
     wallElements.forEach(element => {
       // Convert 3D position to 2D facade position
       let x, y;
       
       if (activeWall === WallType.North) {
         x = (element.position.x + wallWidth / 2) * scaleX;
-        y = canvas.height - ((element.position.y + Y_OFFSET) * scaleY);
+        // Y position is calculated from the ground up
+        y = groundY - (element.position.y * scaleY);
       } else if (activeWall === WallType.South) {
         x = (wallWidth / 2 - element.position.x) * scaleX;
-        y = canvas.height - ((element.position.y + Y_OFFSET) * scaleY);
+        y = groundY - (element.position.y * scaleY);
       } else if (activeWall === WallType.East) {
         x = (element.position.z + wallWidth / 2) * scaleX;
-        y = canvas.height - ((element.position.y + Y_OFFSET) * scaleY);
+        y = groundY - (element.position.y * scaleY);
       } else { // West
         x = (wallWidth / 2 - element.position.z) * scaleX;
-        y = canvas.height - ((element.position.y + Y_OFFSET) * scaleY);
+        y = groundY - (element.position.y * scaleY);
       }
       
-      // Element dimensions
+      // Element dimensions - use consistent scaling
       const width = element.dimensions.width * scaleX;
       const height = element.dimensions.height * scaleY;
       
@@ -238,37 +293,262 @@ const FacadeEditor: React.FC = () => {
           strokeColor = element.id === selectedElementId ? '#F7B84B' : '#0066cc';
       }
       
-      // Draw element with industrial style
-      ctx.fillStyle = fillColor;
-      ctx.fillRect(x - width / 2, y - height, width, height);
+      // Draw doors and windows with consistent proportions and detailed visualizations
+      if (element.type === ElementType.Door || 
+          element.type === ElementType.SectionalDoor || 
+          element.type === ElementType.WindowedSectionalDoor) {
+        
+        // Use ground level as reference point
+        const doorBottomY = groundY;
+        
+        // Calculate door position and size in canvas coordinates
+        const doorWidth = element.dimensions.width * scaleX;
+        const doorHeight = element.dimensions.height * scaleY;
+        const doorTopY = doorBottomY - doorHeight;
+        
+        // Draw door with proper dimensions
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(x - doorWidth / 2, doorTopY, doorWidth, doorHeight);
+        
+        // Draw door outline
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = element.id === selectedElementId ? 3 : 2;
+        ctx.strokeRect(x - doorWidth / 2, doorTopY, doorWidth, doorHeight);
+        
+        // Add realistic door details based on type
+        if (element.type === ElementType.Door) {
+          // Standard door details
+          
+          // Door frame
+          ctx.strokeStyle = "#444444";
+          ctx.lineWidth = 1;
+          ctx.strokeRect(x - doorWidth / 2 + 2, doorTopY + 2, doorWidth - 4, doorHeight - 4);
+          
+          // Door handle
+          ctx.fillStyle = "#aaaaaa";
+          ctx.beginPath();
+          ctx.arc(x + doorWidth / 4, doorBottomY - doorHeight / 2, 3, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Door labels with dimensions
+          ctx.fillStyle = "#FFFFFF";
+          ctx.font = "bold 10px Arial";
+          ctx.textAlign = "center";
+          ctx.fillText(`Regular Door`, x, doorTopY + doorHeight / 2 - 10);
+          ctx.font = "10px monospace";
+          ctx.fillText(`${element.dimensions.width.toFixed(1)}m × ${element.dimensions.height.toFixed(1)}m`, 
+                      x, doorTopY + doorHeight / 2 + 10);
+        } 
+        else if (element.type === ElementType.SectionalDoor || element.type === ElementType.WindowedSectionalDoor) {
+          // Sectional door has horizontal panels
+          const panels = 4; // Number of horizontal panels
+          const panelHeight = doorHeight / panels;
+          
+          // Draw panels
+          ctx.strokeStyle = "#444444";
+          ctx.lineWidth = 1;
+          
+          for (let i = 1; i < panels; i++) {
+            const panelY = doorTopY + (i * panelHeight);
+            ctx.beginPath();
+            ctx.moveTo(x - doorWidth / 2, panelY);
+            ctx.lineTo(x + doorWidth / 2, panelY);
+            ctx.stroke();
+          }
+          
+          // Add vertical frame lines
+          ctx.beginPath();
+          ctx.moveTo(x - doorWidth / 2 + 5, doorTopY);
+          ctx.lineTo(x - doorWidth / 2 + 5, doorBottomY);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(x + doorWidth / 2 - 5, doorTopY);
+          ctx.lineTo(x + doorWidth / 2 - 5, doorBottomY);
+          ctx.stroke();
+          
+          // Add windows for WindowedSectionalDoor
+          if (element.type === ElementType.WindowedSectionalDoor) {
+            // Add row of windows in the upper part
+            const windowTopRow = doorTopY + panelHeight * 0.5;
+            const windowWidth = doorWidth / 6;
+            const windowHeight = panelHeight * 0.6;
+            
+            ctx.fillStyle = "#a3c6e8"; // Light blue for windows
+            
+            for (let i = 0; i < 4; i++) {
+              const windowX = x - (doorWidth / 3) + (i * windowWidth * 1.5);
+              ctx.fillRect(windowX - windowWidth / 2, windowTopRow - windowHeight / 2, windowWidth, windowHeight);
+              
+              // Window frame
+              ctx.strokeRect(windowX - windowWidth / 2, windowTopRow - windowHeight / 2, windowWidth, windowHeight);
+            }
+          }
+          
+          // Door handle/control unit
+          ctx.fillStyle = "#777777";
+          ctx.fillRect(x - doorWidth / 10, doorBottomY - panelHeight / 2, doorWidth / 5, panelHeight / 4);
+          
+          // Door labels with dimensions
+          ctx.fillStyle = "#FFFFFF";
+          ctx.font = "bold 11px Arial";
+          ctx.textAlign = "center";
+          ctx.fillText(element.type === ElementType.SectionalDoor ? "Sectional Door" : "Windowed Sectional Door", 
+                      x, doorTopY + 15);
+          ctx.font = "10px monospace";
+          ctx.fillText(`${element.dimensions.width.toFixed(1)}m × ${element.dimensions.height.toFixed(1)}m`, 
+                      x, doorTopY + 30);
+        }
+        
+        // Add measurement guides specifically for doors when selected
+        if (element.id === selectedElementId) {
+          // Vertical height guide
+          ctx.strokeStyle = "#22cc44"; // Green guide
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 3]); // Dashed line
+          
+          // Draw height guide line
+          ctx.beginPath();
+          ctx.moveTo(x + doorWidth / 2 + 10, doorTopY);
+          ctx.lineTo(x + doorWidth / 2 + 10, doorBottomY);
+          ctx.stroke();
+          
+          // Add height arrows
+          ctx.beginPath();
+          ctx.moveTo(x + doorWidth / 2 + 5, doorTopY);
+          ctx.lineTo(x + doorWidth / 2 + 15, doorTopY);
+          ctx.stroke();
+          
+          ctx.beginPath();
+          ctx.moveTo(x + doorWidth / 2 + 5, doorBottomY);
+          ctx.lineTo(x + doorWidth / 2 + 15, doorBottomY);
+          ctx.stroke();
+          
+          // Height label
+          ctx.fillStyle = "#22cc44";
+          ctx.font = "10px monospace";
+          ctx.textAlign = "left";
+          ctx.fillText(`${element.dimensions.height.toFixed(1)}m`, x + doorWidth / 2 + 15, doorTopY + doorHeight / 2);
+          
+          // Reset line dash
+          ctx.setLineDash([]);
+          
+          // Draw bottom edge indicator
+          ctx.strokeStyle = "#D32F2F";
+          ctx.lineWidth = 2;
+          ctx.beginPath();
+          ctx.moveTo(x - doorWidth / 2 - 10, doorBottomY);
+          ctx.lineTo(x + doorWidth / 2 + 10, doorBottomY);
+          ctx.stroke();
+          
+          // Bottom edge label
+          ctx.fillStyle = "#D32F2F";
+          ctx.font = "10px Arial";
+          ctx.fillText("Ground Level", x, doorBottomY + 15);
+          
+          // Proportional relationship to building
+          const buildingHeight = dimensions.height;
+          const proportion = (element.dimensions.height / buildingHeight * 100).toFixed(0);
+          
+          ctx.fillStyle = "#ffffff";
+          ctx.font = "9px monospace";
+          ctx.fillText(`${proportion}% of building height`, x, doorTopY - 5);
+        }
+      } 
+      // Other elements like windows and light bands
+      else {
+        // Use the same consistent scale for other elements
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(x - width / 2, y - height, width, height);
+        
+        // Draw outline
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = element.id === selectedElementId ? 3 : 2;
+        ctx.strokeRect(x - width / 2, y - height, width, height);
+        
+        // Element label with dimensions
+        ctx.fillStyle = '#FFFFFF';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${element.type} (${element.dimensions.width.toFixed(1)}x${element.dimensions.height.toFixed(1)}m)`, 
+                     x, y - height/2);
+      }
       
-      // Draw outline with metallic look
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = element.id === selectedElementId ? 3 : 2;
-      ctx.strokeRect(x - width / 2, y - height, width, height);
-      
-      // Draw element type label with technical font
-      ctx.fillStyle = '#FFFFFF';
-      ctx.font = 'bold 10px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(element.type, x, y - height / 2);
-      
-      // Draw bottom edge indicator if selected
+      // For selected elements, add additional info
       if (element.id === selectedElementId) {
         ctx.strokeStyle = '#D32F2F';
         ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.moveTo(x - width / 2, y);
-        ctx.lineTo(x + width / 2, y);
-        ctx.stroke();
         
-        // Label the bottom edge
-        ctx.fillStyle = '#D32F2F';
-        ctx.font = '10px monospace';
-        ctx.textAlign = 'left';
-        ctx.fillText('Bottom edge', x + width / 2 + 5, y);
+        // Draw selection box
+        const drawY = element.type.includes("Door") ? groundY - height : y;
+        
+        // Draw bottom edge indicator
+        ctx.beginPath();
+        ctx.moveTo(x - width / 2, element.type.includes("Door") ? groundY : y);
+        ctx.lineTo(x + width / 2, element.type.includes("Door") ? groundY : y);
+        ctx.stroke();
       }
     });
+    
+    // Draw a scale legend
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'left';
+    ctx.fillText('Scale Reference:', canvas.width - 180, 20);
+    
+    // Draw 1m scale bar
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(canvas.width - 160, 40);
+    ctx.lineTo(canvas.width - 160 + 1 * scaleX, 40);
+    ctx.stroke();
+    ctx.fillText('1 meter', canvas.width - 150, 45);
+    
+    // Draw 2m scale bar
+    ctx.beginPath();  
+    ctx.moveTo(canvas.width - 160, 60);
+    ctx.lineTo(canvas.width - 160 + 2 * scaleX, 60);
+    ctx.stroke();
+    ctx.fillText('2 meters', canvas.width - 150, 65);
+    
+    // After drawing all elements, add a scale comparison box
+    // This will help show the proportional relationship between doors and standard heights
+    ctx.fillStyle = "rgba(100,100,100,0.2)";
+    ctx.fillRect(60, groundY - 100, 80, 100); // 100px-tall box (representing ~2m)
+
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "10px Arial";
+    ctx.textAlign = "left";
+    ctx.fillText("Scale Reference", 65, groundY - 85);
+
+    // Door height references
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = 1;
+
+    // Regular door height line (2.1m)
+    const regDoorHeight = 2.1 * scaleY;
+    ctx.beginPath();
+    ctx.moveTo(70, groundY - regDoorHeight);
+    ctx.lineTo(90, groundY - regDoorHeight);
+    ctx.stroke();
+    ctx.fillText("Door: 2.1m", 95, groundY - regDoorHeight);
+
+    // Sectional door height line (3.0m)
+    const sectDoorHeight = 3.0 * scaleY;
+    ctx.beginPath();
+    ctx.moveTo(70, groundY - sectDoorHeight);
+    ctx.lineTo(90, groundY - sectDoorHeight);
+    ctx.stroke();
+    ctx.fillText("Sect. Door: 3.0m", 95, groundY - sectDoorHeight);
+
+    // Human height line (1.8m) - FIXED: Use the existing humanHeight variable
+    ctx.beginPath();
+    ctx.moveTo(70, groundY - humanHeight);
+    ctx.lineTo(90, groundY - humanHeight);
+    ctx.stroke();
+    ctx.fillText("Human: 1.8m", 95, groundY - humanHeight);
+    
   }, [activeWall, dimensions, elements, selectedElementId, wallElements, Y_OFFSET]);
   
   // Update canvas when relevant state changes
@@ -329,25 +609,25 @@ const FacadeEditor: React.FC = () => {
     if (activeWall === WallType.North) {
       newPosition = {
         x: (mouseX / scaleX) - (wallWidth / 2),
-        y: (canvas.height - mouseY) / scaleY - Y_OFFSET,
+        y: (canvas.height - mouseY) / scaleY, // Adjusted to remove Y_OFFSET
         z: -dimensions.width / 2
       };
     } else if (activeWall === WallType.South) {
       newPosition = {
         x: (wallWidth / 2) - (mouseX / scaleX),
-        y: (canvas.height - mouseY) / scaleY - Y_OFFSET,
+        y: (canvas.height - mouseY) / scaleY,
         z: dimensions.width / 2
       };
     } else if (activeWall === WallType.East) {
       newPosition = {
         x: dimensions.length / 2,
-        y: (canvas.height - mouseY) / scaleY - Y_OFFSET,
+        y: (canvas.height - mouseY) / scaleY,
         z: (mouseX / scaleX) - (wallWidth / 2)
       };
     } else { // West
       newPosition = {
         x: -dimensions.length / 2,
-        y: (canvas.height - mouseY) / scaleY - Y_OFFSET,
+        y: (canvas.height - mouseY) / scaleY,
         z: (wallWidth / 2) - (mouseX / scaleX)
       };
     }
@@ -542,29 +822,38 @@ const FacadeEditor: React.FC = () => {
       [ElementType.LightBand]: { width: 2.0, height: 0.5, depth: 0.1 },
     };
 
-    // Get element height for proper positioning
-    const elementHeight = elementDimensions[type].height;
+    // Get element dimensions for positioning
     const elementWidth = elementDimensions[type].width;
+    const elementHeight = elementDimensions[type].height;
     
     // Find a suitable X position that doesn't overlap with existing elements
     const xPosition = findSuitablePosition(type, elementWidth);
     
-    // Default position based on wall
-    let position = { x: 0, y: 0, z: 0 };
-    let rotation = { x: 0, y: 0, z: 0 };
+    // Calculate Y position based on element type - ONE SINGLE DECLARATION
+    let yPosition;
+    
+    // Different positioning logic for different element types
+    if (type === ElementType.Door || type === ElementType.SectionalDoor || type === ElementType.WindowedSectionalDoor) {
+      // All doors should have their bottom edge at ground level (y=0)
+      // Position is at center, so we add half the height to get from bottom to center
+      yPosition = elementHeight / 2;
+      console.log(`Positioning ${type} with height ${elementHeight} at Y=${yPosition} (bottom at y=0)`);
+    } else if (type === ElementType.LightBand) {
+      // Special case for light bands - position them higher up on the wall
+      yPosition = 5.3; // Set light bands at 5.3m height
+    } else {
+      // Default placement for windows and other elements
+      yPosition = elementHeight / 2; // Center at half height
+    }
     
     // Calculate wall offset
     const wallOffset = 0.5;
     const wallThickness = 0.15;
     const elementOffset = wallThickness / 2 + 0.01;
     
-    // Set initial Y position based on element type
-    let yPosition = elementHeight / 2; // Default for most elements
-    
-    // Special case for light bands - position them higher up on the wall
-    if (type === ElementType.LightBand) {
-      yPosition = 5.3; // Set light bands at 5.9m height
-    }
+    // Define position and rotation
+    let position = { x: 0, y: 0, z: 0 };
+    let rotation = { x: 0, y: 0, z: 0 };
     
     switch (activeWall) {
       case WallType.North:
@@ -573,7 +862,7 @@ const FacadeEditor: React.FC = () => {
           y: yPosition, 
           z: -dimensions.width / 2 - wallOffset - elementOffset
         };
-        rotation = { x: 0, y: Math.PI, z: 0 }; // Rotate 180 degrees to face outward
+        rotation = { x: 0, y: Math.PI, z: 0 };
         break;
       case WallType.South:
         position = { 
