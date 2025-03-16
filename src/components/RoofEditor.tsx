@@ -250,7 +250,7 @@ const RoofEditor: React.FC = () => {
       ctx.stroke();
     }
     
-    // Draw roof elements
+    // Draw roof elements with fixed ridge skylight orientation
     roofElements.forEach(element => {
       // Convert 3D position to 2D roof position
       let x, y;
@@ -277,11 +277,19 @@ const RoofEditor: React.FC = () => {
         y = (element.position.z + roofWidth / 2) * scaleY;
       }
       
-      // Element dimensions
-      const width = element.dimensions.width * scaleX;
-      const height = element.type === RoofElementType.RidgeSkylights 
-        ? (element.dimensions.length || 1) * scaleX 
-        : element.dimensions.width * scaleY;
+      // Element dimensions - Use correct orientation
+      let width, height;
+      
+      if (element.type === RoofElementType.RidgeSkylights) {
+        // For ridge skylights, use width and length in their natural orientation
+        // This aligns the length with the ridge (which should be horizontal in the editor)
+        width = (element.dimensions.length || 3) * scaleX; // Length along X axis
+        height = element.dimensions.width * scaleY; // Width along Y axis
+      } else {
+        // Dome skylights remain the same
+        width = element.dimensions.width * scaleX;
+        height = element.dimensions.width * scaleY;
+      }
       
       // Set colors based on element type - industrial theme
       let fillColor, strokeColor;
@@ -305,7 +313,8 @@ const RoofEditor: React.FC = () => {
         ctx.arc(x, y, width / 2, 0, Math.PI * 2);
         ctx.stroke();
       } else {
-        // Draw as rectangle for ridge skylights
+        // FIXED: Draw ridge skylight as a horizontal rectangle (no rotation needed)
+        // Just draw the rectangle directly without rotation
         ctx.fillRect(x - width / 2, y - height / 2, width, height);
         
         // Draw outline
@@ -436,11 +445,18 @@ const RoofEditor: React.FC = () => {
         elementY = (element.position.z + roofWidth / 2) * scaleY;
       }
       
-      // Element dimensions
-      const width = element.dimensions.width * scaleX;
-      const height = element.type === RoofElementType.RidgeSkylights 
-        ? (element.dimensions.length || 1) * scaleX 
-        : element.dimensions.width * scaleY;
+      // Element dimensions - Match the drawing function
+      let width, height;
+      
+      if (element.type === RoofElementType.RidgeSkylights) {
+        // Match the drawing function - no rotation
+        width = (element.dimensions.length || 3) * scaleX;
+        height = element.dimensions.width * scaleY;
+      } else {
+        // Dome skylights remain the same
+        width = element.dimensions.width * scaleX;
+        height = element.dimensions.width * scaleY;
+      }
       
       // Check if mouse is inside element
       if (element.type === RoofElementType.DomeSkylights) {
@@ -450,7 +466,8 @@ const RoofEditor: React.FC = () => {
           return element;
         }
       } else {
-        // For ridge skylights (rectangular)
+        // FIXED: Check hit for ridge skylights with no rotation
+        // Simply check if point is in rect
         if (
           x >= elementX - width / 2 &&
           x <= elementX + width / 2 &&
@@ -529,6 +546,9 @@ const RoofEditor: React.FC = () => {
     // Default position based on roof type
     let position, rotation;
     
+    // Calculate default length (12m less than building length, but minimum 3m)
+    const defaultLength = Math.max(3, dimensions.length - 12);
+    
     if (roofType === RoofType.Flat) {
       // For flat roof, place in the middle
       position = { x: 0, y: dimensions.height + 0.05, z: 0 };
@@ -565,9 +585,9 @@ const RoofEditor: React.FC = () => {
       position,
       rotation,
       dimensions: { 
-        width: 1.0,   // Width of the skylight
-        height: 0.4,  // Height of the skylight
-        length: 3.0   // Length along the ridge
+        width: 1.0,              // Width of the skylight
+        height: 0.4,             // Height of the skylight
+        length: defaultLength    // Length is now proportional to building
       },
       material: {
         id: 'polycarbonate',
