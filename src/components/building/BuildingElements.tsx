@@ -195,15 +195,32 @@ const BuildingElements: React.FC<BuildingElementsProps> = ({ elements, dimension
         
         switch (type) {
           case ElementType.Window:
-            // Window rendering code
+            // Window rendering code - FIXED: Implement complete window rendering
             return (
               <group
                 key={id}
                 position={[adjustedPosition.x, adjustedPosition.y, adjustedPosition.z]}
                 rotation={[adjustedRotation.x, adjustedRotation.y, adjustedRotation.z]}
               >
-                {/* ... window rendering code ... */}
-                {/* Using light material panels and frame material for structure */}
+                {/* Window frame */}
+                <mesh material={frameMaterial}>
+                  <boxGeometry args={[elementDim.width + 0.1, elementDim.height + 0.1, 0.05]} />
+                </mesh>
+                
+                {/* Window glass */}
+                <mesh position={[0, 0, 0.01]} material={glassMaterial}>
+                  <boxGeometry args={[elementDim.width - 0.05, elementDim.height - 0.05, 0.02]} />
+                </mesh>
+                
+                {/* Window dividers - horizontal */}
+                <mesh position={[0, 0, 0.03]} material={frameMaterial}>
+                  <boxGeometry args={[elementDim.width - 0.1, 0.05, 0.01]} />
+                </mesh>
+                
+                {/* Window dividers - vertical */}
+                <mesh position={[0, 0, 0.03]} material={frameMaterial}>
+                  <boxGeometry args={[0.05, elementDim.height - 0.1, 0.01]} />
+                </mesh>
               </group>
             );
             
@@ -213,15 +230,34 @@ const BuildingElements: React.FC<BuildingElementsProps> = ({ elements, dimension
             return createDoorWithBottomAt(type, elementDim, adjustedPosition, adjustedRotation, elementMaterial, frameMaterial, glassMaterial);
             
           case ElementType.LightBand:
-            // Light band rendering code
+            // Light band rendering code - FIXED: Implement complete light band rendering
             return (
               <group
                 key={id}
                 position={[adjustedPosition.x, adjustedPosition.y, adjustedPosition.z]}
                 rotation={[adjustedRotation.x, adjustedRotation.y, adjustedRotation.z]}
               >
-                {/* ... light band rendering code ... */}
-                {/* Using light material panels and frame material for structure */}
+                {/* Light band frame */}
+                <mesh material={frameMaterial}>
+                  <boxGeometry args={[elementDim.width + 0.1, elementDim.height + 0.1, 0.1]} />
+                </mesh>
+                
+                {/* Light band translucent panels */}
+                <mesh position={[0, 0, 0.02]} material={lightMaterial}>
+                  <boxGeometry args={[elementDim.width - 0.05, elementDim.height - 0.05, 0.04]} />
+                </mesh>
+                
+                {/* Add vertical dividers for segments */}
+                {Array.from({ length: Math.ceil(elementDim.width) }).map((_, idx) => {
+                  if (idx === 0) return null; // Skip first position
+                  const xPos = -(elementDim.width / 2) + (idx * (elementDim.width / Math.ceil(elementDim.width)));
+                  
+                  return (
+                    <mesh key={`divider-${idx}`} position={[xPos, 0, 0.03]} material={frameMaterial}>
+                      <boxGeometry args={[0.05, elementDim.height - 0.1, 0.06]} />
+                    </mesh>
+                  );
+                })}
               </group>
             );
             
