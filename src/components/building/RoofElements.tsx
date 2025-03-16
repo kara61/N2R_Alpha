@@ -19,26 +19,26 @@ const RoofElements: React.FC<RoofElementsProps> = ({
   roofType,
   roofPitch
 }) => {
-  // Create reusable materials with better visual properties
+  // Update materials to make glass more visible
   const materials = useMemo(() => {
     return {
-      // Semi-transparent polycarbonate material for skylight domes
+      // Significantly more visible glass material with higher opacity and blue tint
       skylight: new THREE.MeshPhysicalMaterial({
-        color: '#d4f1f9',
-        roughness: 0.2,
-        metalness: 0.1,
+        color: '#78c8ff', // Brighter blue tint for better visibility
+        roughness: 0.1, 
+        metalness: 0.3,
         transparent: true,
-        opacity: 0.7,
-        transmission: 0.2,
-        clearcoat: 0.5,
+        opacity: 0.9, // Higher opacity
+        transmission: 0.6, // Higher transmission
+        clearcoat: 0.8,
         clearcoatRoughness: 0.1,
         side: THREE.DoubleSide
       }),
-      // Aluminum frame material for skylight edges
+      // Brighter and more pronounced frame material
       frame: new THREE.MeshStandardMaterial({
-        color: '#999999',
-        roughness: 0.4,
-        metalness: 0.8
+        color: '#cccccc', // Lighter aluminum color
+        roughness: 0.3,
+        metalness: 0.9 // Higher metalness for better contrast
       })
     };
   }, []);
@@ -67,12 +67,28 @@ const RoofElements: React.FC<RoofElementsProps> = ({
     };
   }, [buildingWidth, buildingLength, buildingHeight, roofPitch]);
 
-  // Render a single dome skylight with more of an elliptical shape
-  const renderDomeSkylight = (element: RoofElement) => {
+  // Updated renderRoofWindow function to show a single piece of glass without dividers
+  const renderRoofWindow = (element: RoofElement) => {
     const { id, position, rotation, dimensions } = element;
-    const radius = dimensions.width / 2;
-    // Make height slightly less than width for a more elliptical dome
-    const domeHeight = dimensions.height || 0.3;
+    // Fixed dimensions for roof window: 1.3m x 1.3m
+    const width = 1.3;
+    const length = 1.3;
+    const thickness = 0.08; // Thicker for better visibility
+    
+    // Create a glass material with improved visibility
+    const glassMaterial = new THREE.MeshPhysicalMaterial({
+      color: '#78c8ff', // Brighter blue tint
+      roughness: 0.1,
+      metalness: 0.3,
+      transparent: true,
+      opacity: 0.9,
+      transmission: 0.6,
+      clearcoat: 0.8,
+      clearcoatRoughness: 0.1,
+      side: THREE.DoubleSide
+    });
+    
+    console.log(`Rendering roof window: position=${JSON.stringify(position)}, rotation=${JSON.stringify(rotation)}`);
 
     return (
       <group 
@@ -81,23 +97,19 @@ const RoofElements: React.FC<RoofElementsProps> = ({
         rotation={[rotation.x, rotation.y, rotation.z]}
         userData={{ isRoofElement: true, id: id }}
       >
-        {/* Base frame */}
+        {/* Outer frame only - thicker and more pronounced */}
         <mesh material={materials.frame} receiveShadow castShadow>
-          <cylinderGeometry args={[radius + 0.05, radius + 0.05, 0.05, 32]} />
+          <boxGeometry args={[length, thickness, width]} />
         </mesh>
         
-        {/* Create an elliptical dome by scaling a half sphere */}
-        <group scale={[1, domeHeight / radius, 1]}>
-          <mesh 
-            position={[0, radius/2, 0]}
-            material={materials.skylight} 
-            receiveShadow
-          >
-            <sphereGeometry 
-              args={[radius, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2]} 
-            />
-          </mesh>
-        </group>
+        {/* Single large glass pane - sits above the frame */}
+        <mesh 
+          position={[0, thickness * 0.7, 0]} 
+          material={glassMaterial}
+          receiveShadow
+        >
+          <boxGeometry args={[length * 0.9, thickness/3, width * 0.9]} />
+        </mesh>
       </group>
     );
   };
@@ -136,8 +148,8 @@ const RoofElements: React.FC<RoofElementsProps> = ({
   return (
     <group>
       {roofElements.map(element => {
-        if (element.type === RoofElementType.DomeSkylights) {
-          return renderDomeSkylight(element);
+        if (element.type === RoofElementType.RoofWindow) {
+          return renderRoofWindow(element);
         } else if (element.type === RoofElementType.RidgeSkylights) {
           return renderRidgeSkylight(element);
         }

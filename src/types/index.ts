@@ -27,7 +27,7 @@ export enum WallType {
 }
 
 export enum RoofElementType {
-  DomeSkylights = 'domeSkylights',
+  RoofWindow = 'roofWindow', // Changed from DomeSkylights to RoofWindow
   RidgeSkylights = 'ridgeSkylights',
   // We could add more roof element types in the future:
   // VentilationUnit = 'ventilationUnit',

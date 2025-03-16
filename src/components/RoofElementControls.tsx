@@ -47,7 +47,9 @@ const RoofElementControls: React.FC = () => {
   return (
     <div className="absolute bottom-4 left-1/2 transform -translate-x-1/2 bg-steel-blue p-4 rounded-lg shadow-lg neumorphic animate-slideIn">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="font-semibold text-accent-yellow">Edit {selectedElement.type}</h3>
+        <h3 className="font-semibold text-accent-yellow">
+          Edit {selectedElement.type === RoofElementType.RoofWindow ? 'Roof Window' : 'Ridge Skylight'}
+        </h3>
         <button 
           onClick={() => selectRoofElement(null)}
           className="text-light-gray hover:text-accent-yellow transition-colors"

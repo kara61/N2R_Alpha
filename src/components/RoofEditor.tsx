@@ -3,7 +3,7 @@ import { useBuildingStore } from '../store/buildingStore';
 import { RoofElementType, RoofType } from '../types';
 import { X, Move, ArrowLeft, Plus, Trash2, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
-// Add this helper function at the top of the file (outside the component)
+// Complete rewrite of the calculateRoofPosition function to fix the rotation issues
 function calculateRoofPosition(
   canvasX: number, 
   canvasY: number, 
@@ -39,7 +39,7 @@ function calculateRoofPosition(
   if (roofType === RoofType.Flat) {
     // For flat roof, direct mapping
     z = (canvasY / scaleY) - (roofWidth / 2);
-    y = dimensions.height + 0.05; // Slightly above the roof
+    y = dimensions.height + 0.1; // Double the offset
   } 
   else if (roofType === RoofType.Gable) {
     // For gable roof, need special handling for ridge
@@ -62,6 +62,7 @@ function calculateRoofPosition(
       const ratio = Math.min(distanceFromRidge / halfWidth, 1);
       y = dimensions.height + roofHeight - (ratio * roofHeight);
     }
+    y += 0.1; // Double the offset for better visibility
   } 
   else { // Monopitch
     // For monopitch roof, height varies linearly from high to low side
@@ -71,6 +72,7 @@ function calculateRoofPosition(
     // Calculate height along the slope (high side = height + roofHeight, low side = height)
     const ratio = Math.min(distanceFromHighEdge / dimensions.width, 1);
     y = dimensions.height + roofHeight - (ratio * roofHeight);
+    y += 0.1; // Double the offset for better visibility
   }
   
   // Calculate rotation based on roof type to match the slope
@@ -78,11 +80,17 @@ function calculateRoofPosition(
   
   if (roofType === RoofType.Gable) {
     const angle = Math.atan(roofHeight / (dimensions.width / 2));
-    rotationX = z < 0 ? angle : -angle; // Opposite angles on each side of ridge
+    
+    // For gable roof, the rotation direction needs to be inverted compared to what we might expect
+    // because of how Three.js handles rotation around the x-axis
+    rotationX = z < 0 ? -angle : angle;
   }
   else if (roofType === RoofType.Monopitch) {
     rotationX = -Math.atan(roofHeight / dimensions.width);
   }
+  
+  // Debug the calculation to make sure values are reasonable
+  console.log(`Canvas position: (${canvasX}, ${canvasY}) -> 3D position: (${x}, ${y}, ${z}), rotation: (${rotationX}, 0, 0)`);
   
   return { 
     position: { x, y, z },
@@ -277,18 +285,17 @@ const RoofEditor: React.FC = () => {
         y = (element.position.z + roofWidth / 2) * scaleY;
       }
       
-      // Element dimensions - Use correct orientation
+      // Element dimensions - Use fixed dimensions for roof windows
       let width, height;
       
       if (element.type === RoofElementType.RidgeSkylights) {
-        // For ridge skylights, use width and length in their natural orientation
-        // This aligns the length with the ridge (which should be horizontal in the editor)
-        width = (element.dimensions.length || 3) * scaleX; // Length along X axis
-        height = element.dimensions.width * scaleY; // Width along Y axis
-      } else {
-        // Dome skylights remain the same
-        width = element.dimensions.width * scaleX;
+        // Keep ridge skylights as is
+        width = (element.dimensions.length || 3) * scaleX;
         height = element.dimensions.width * scaleY;
+      } else if (element.type === RoofElementType.RoofWindow) {
+        // Fixed size for roof windows: 1.3m x 1.3m
+        width = 1.3 * scaleX;
+        height = 1.3 * scaleY;
       }
       
       // Set colors based on element type - industrial theme
@@ -300,21 +307,26 @@ const RoofEditor: React.FC = () => {
       // Draw element with industrial style
       ctx.fillStyle = fillColor;
       
-      if (element.type === RoofElementType.DomeSkylights) {
-        // Draw as circle for dome skylights
-        ctx.beginPath();
-        ctx.arc(x, y, width / 2, 0, Math.PI * 2);
-        ctx.fill();
-        
-        // Draw outline
+      // Draw the element as a square without grid lines for window
+      if (element.type === RoofElementType.RoofWindow) {
+        // Draw the main square with frame
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = element.id === selectedRoofElementId ? 3 : 2;
-        ctx.beginPath();
-        ctx.arc(x, y, width / 2, 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.strokeRect(x - width / 2, y - height / 2, width, height);
+        
+        // Draw a slightly smaller filled rectangle to represent the glass
+        const glassInset = 4; // pixels inset for the glass part
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(
+          x - width / 2 + glassInset, 
+          y - height / 2 + glassInset, 
+          width - glassInset * 2, 
+          height - glassInset * 2
+        );
+        
+        // Remove the grid lines - we don't want to draw them anymore
       } else {
-        // FIXED: Draw ridge skylight as a horizontal rectangle (no rotation needed)
-        // Just draw the rectangle directly without rotation
+        // Ridge skylights remain the same
         ctx.fillRect(x - width / 2, y - height / 2, width, height);
         
         // Draw outline
@@ -327,7 +339,7 @@ const RoofEditor: React.FC = () => {
       ctx.fillStyle = '#FFFFFF';
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
-      ctx.fillText(element.type === RoofElementType.DomeSkylights ? 'Dome' : 'Ridge', x, y);
+      ctx.fillText(element.type === RoofElementType.RoofWindow ? 'Window' : 'Ridge', x, y);
     });
   }, [dimensions, roofElements, selectedRoofElementId, roofType]);
   
@@ -380,11 +392,11 @@ const RoofEditor: React.FC = () => {
       dimensions
     );
     
-    // Update element with new position and rotation
+    // Always update both position and rotation for roof windows to match the roof
+    // For ridge skylights, only update position (keep original rotation)
     updateRoofElement(selectedRoofElementId, { 
       position, 
-      // Only update rotation for dome skylights, keep existing rotation for ridge skylights
-      rotation: element.type === RoofElementType.DomeSkylights ? rotation : element.rotation
+      rotation: element.type === RoofElementType.RoofWindow ? rotation : element.rotation
     });
   };
   
@@ -445,65 +457,56 @@ const RoofEditor: React.FC = () => {
         elementY = (element.position.z + roofWidth / 2) * scaleY;
       }
       
-      // Element dimensions - Match the drawing function
+      // Element dimensions - Fixed dimensions for dome skylights
       let width, height;
       
       if (element.type === RoofElementType.RidgeSkylights) {
-        // Match the drawing function - no rotation
         width = (element.dimensions.length || 3) * scaleX;
         height = element.dimensions.width * scaleY;
-      } else {
-        // Dome skylights remain the same
-        width = element.dimensions.width * scaleX;
-        height = element.dimensions.width * scaleY;
+      } else if (element.type === RoofElementType.DomeSkylights) {
+        // Fixed dimensions for dome skylights
+        width = 1.3 * scaleX;
+        height = 1.3 * scaleY;
       }
       
-      // Check if mouse is inside element
-      if (element.type === RoofElementType.DomeSkylights) {
-        // For dome skylights (circular)
-        const distance = Math.sqrt(Math.pow(x - elementX, 2) + Math.pow(y - elementY, 2));
-        if (distance <= width / 2) {
-          return element;
-        }
-      } else {
-        // FIXED: Check hit for ridge skylights with no rotation
-        // Simply check if point is in rect
-        if (
-          x >= elementX - width / 2 &&
-          x <= elementX + width / 2 &&
-          y >= elementY - height / 2 &&
-          y <= elementY + height / 2
-        ) {
-          return element;
-        }
+      // Check if mouse is inside element - all elements use the same hit test now
+      if (
+        x >= elementX - width / 2 &&
+        x <= elementX + width / 2 &&
+        y >= elementY - height / 2 &&
+        y <= elementY + height / 2
+      ) {
+        return element;
       }
     }
     
     return null;
   };
 
-  // Replace the addDomeSkylight function with this improved version
-  const addDomeSkylight = () => {
-    // Calculate a reasonable default position in the center of the roof
+  // Fix the addRoofWindow function to properly set initial position and rotation
+  const addRoofWindow = () => {
+    // Default position based on roof type
     let position, rotation;
     
-    // Default position based on roof type
+    // Position the roof window based on roof type and ensure it lies flat on the roof
     if (roofType === RoofType.Flat) {
-      position = { x: 0, y: dimensions.height + 0.05, z: 0 };
-      rotation = { x: 0, y: 0, z: 0 };
+      position = { x: 0, y: dimensions.height + 0.1, z: 0 }; // Double the offset
+      rotation = { x: 0, y: 0, z: 0 }; // Flat roof = no rotation
     } 
     else if (roofType === RoofType.Gable) {
-      // For gable roof, place on the front side of the roof
+      // For gable roof, place on the front side of the roof with proper pitch
       const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
       const angle = Math.atan(roofHeight / (dimensions.width / 2));
       
+      // Place on front side (negative Z value)
       position = { 
         x: 0, 
-        y: dimensions.height + roofHeight * 0.5, // Halfway up the roof slope 
-        z: -dimensions.width / 4               // Quarter way from ridge to eave
+        y: dimensions.height + roofHeight * 0.5 + 0.1, // Double the offset
+        z: -dimensions.width / 4                // Quarter way from ridge to eave
       };
       
-      rotation = { x: angle, y: 0, z: 0 };     // Match the roof slope
+      // IMPORTANT: On the front side (negative Z), we need a negative rotation
+      rotation = { x: -angle, y: 0, z: 0 };
     } 
     else { // Monopitch
       const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
@@ -511,29 +514,29 @@ const RoofEditor: React.FC = () => {
       
       position = {
         x: 0,
-        y: dimensions.height + roofHeight * 0.5, // Halfway up the roof slope
+        y: dimensions.height + roofHeight * 0.5 + 0.1, // Double the offset
         z: 0                                   // Middle of the roof width
       };
       
-      rotation = { x: -angle, y: 0, z: 0 };    // Match the roof slope
+      rotation = { x: -angle, y: 0, z: 0 };    // Match the roof slope (negative because of direction)
     }
     
     const newElement = {
-      id: `dome-skylight-${Date.now()}`,
-      type: RoofElementType.DomeSkylights,
+      id: `roof-window-${Date.now()}`,
+      type: RoofElementType.RoofWindow,
       position,
       rotation,
       dimensions: { 
-        width: 1.0,   // Diameter of the dome
-        height: 0.4,  // Height of the dome
-        depth: 0.1    // Base frame thickness
+        width: 1.3,   // Fixed width - not adjustable
+        height: 0.08, // Thicker for better visibility
+        length: 1.3   // Fixed length - not adjustable
       },
       material: {
-        id: 'polycarbonate',
-        name: 'Polycarbonate',
-        color: '#d4f1f9',
-        roughness: 0.2,
-        metalness: 0.1,
+        id: 'glass',
+        name: 'Glass',
+        color: '#78c8ff', // Brighter blue
+        roughness: 0.1,
+        metalness: 0.3,
       }
     };
     
@@ -645,10 +648,10 @@ const RoofEditor: React.FC = () => {
           <h3 className="font-medium mb-3 text-accent-yellow">Add Elements</h3>
           <div className="space-y-2">
             <button
-              onClick={addDomeSkylight}
+              onClick={addRoofWindow}
               className="w-full bg-dark-gray hover:bg-black text-light-gray font-medium py-2 px-3 rounded flex items-center transition-colors"
             >
-              <Plus className="h-4 w-4 mr-2 text-accent-yellow" /> Dome Skylight
+              <Plus className="h-4 w-4 mr-2 text-accent-yellow" /> Roof Window
             </button>
             <button
               onClick={addRidgeSkylight}
@@ -717,13 +720,12 @@ interface RoofElementPropertiesProps {
 
 const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({ 
   elementId, 
-  buildingDimensions,
+  buildingDimensions, 
   roofType,
   roofPitch
 }) => {
   const { roofElements, updateRoofElement, removeRoofElement } = useBuildingStore();
   const element = roofElements.find(el => el.id === elementId);
-  
   if (!element) return null;
   
   // Replace the handlePositionChange with this improved version
@@ -746,7 +748,7 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
       // Calculate Y position and rotation based on roof type
       if (roofType === RoofType.Flat) {
         // For flat roof, Y is just the roof height
-        newPosition.y = buildingDimensions.height + 0.05;
+        newPosition.y = buildingDimensions.height + 0.1; // Increased offset
       } 
       else if (roofType === RoofType.Gable) {
         // For gable roof, Y depends on distance from ridge
@@ -763,11 +765,14 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
         // Calculate Y position 
         newPosition.y = ridgeHeight - (ratio * roofHeight);
         
-        // Calculate rotation based on which side of the roof
-        if (element.type === RoofElementType.DomeSkylights) {
+        // Calculate rotation to match the roof slope
+        if (element.type === RoofElementType.RoofWindow) {
           const angle = Math.atan(roofHeight / halfWidth);
-          newRotation.x = value < 0 ? angle : -angle;
+          
+          // FIXED: Front slope (negative Z) gets negative angle, back slope (positive Z) gets positive angle
+          newRotation.x = value < 0 ? -angle : angle;
         }
+        newPosition.y += 0.1; // Add a larger offset to the final Y position
       } 
       else { // Monopitch
         // For monopitch, Y depends on position along the slope
@@ -780,19 +785,20 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
         // Calculate Y position
         newPosition.y = highSideHeight - (ratio * roofHeight);
         
-        // Calculate rotation for dome skylights
-        if (element.type === RoofElementType.DomeSkylights) {
+        // Calculate rotation for roof windows
+        if (element.type === RoofElementType.RoofWindow) {
           const angle = Math.atan(roofHeight / buildingDimensions.width);
           newRotation.x = -angle; // Same angle everywhere on monopitch
         }
+        newPosition.y += 0.1; // Add a larger offset to the final Y position
       }
     }
     
     // Update with new position and rotation
     const updates: Partial<RoofElement> = { position: newPosition };
     
-    // Only update rotation for dome skylights
-    if (element.type === RoofElementType.DomeSkylights) {
+    // Always update rotation for roof windows to ensure they lie flat on the roof
+    if (element.type === RoofElementType.RoofWindow) {
       updates.rotation = newRotation;
     }
     
@@ -800,6 +806,11 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
   };
   
   const handleDimensionChange = (dim: 'width' | 'length', value: number) => {
+    // Only allow dimension changes for ridge skylights
+    if (element.type === RoofElementType.DomeSkylights) {
+      return; // Dome skylights have fixed dimensions now
+    }
+    
     const newDimensions = { 
       ...element.dimensions, 
       [dim]: value 
@@ -813,7 +824,7 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
       <div>
         <label className="block text-xs font-medium text-light-gray mb-1">Type</label>
         <div className="text-sm font-medium bg-dark-gray p-2 rounded text-white">
-          {element.type === RoofElementType.DomeSkylights ? 'Dome Skylight' : 'Ridge Skylight'}
+          {element.type === RoofElementType.RoofWindow ? 'Roof Window' : 'Ridge Skylight'}
         </div>
       </div>
       
@@ -851,22 +862,25 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
         </div>
       </div>
       
-      <div>
-        <label className="block text-xs font-medium text-light-gray mb-1">Width (m)</label>
-        <input
-          type="range"
-          min={0.5}
-          max={3}
-          step={0.1}
-          value={element.dimensions.width}
-          onChange={(e) => handleDimensionChange('width', parseFloat(e.target.value))}
-          className="w-full accent-accent-yellow"
-        />
-        <div className="flex justify-between text-xs text-light-gray mt-1">
-          <span>0.5</span>
-          <span>3.0</span>
+      {/* Only show dimension controls for ridge skylights */}
+      {element.type === RoofElementType.RidgeSkylights && (
+        <div>
+          <label className="block text-xs font-medium text-light-gray mb-1">Width (m)</label>
+          <input
+            type="range"
+            min={0.5}
+            max={3}
+            step={0.1}
+            value={element.dimensions.width}
+            onChange={(e) => handleDimensionChange('width', parseFloat(e.target.value))}
+            className="w-full accent-accent-yellow"
+          />
+          <div className="flex justify-between text-xs text-light-gray mt-1">
+            <span>0.5</span>
+            <span>3.0</span>
+          </div>
         </div>
-      </div>
+      )}
       
       {element.type === RoofElementType.RidgeSkylights && (
         <div>
@@ -887,6 +901,16 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
         </div>
       )}
       
+      {/* Add dimension information for roof windows */}
+      {element.type === RoofElementType.RoofWindow && (
+        <div>
+          <label className="block text-xs font-medium text-light-gray mb-1">Dimensions</label>
+          <div className="bg-dark-gray p-2 rounded text-light-gray text-sm">
+            Fixed size: 1.3m × 1.3m
+          </div>
+        </div>
+      )}
+      
       <button
         onClick={() => removeRoofElement(elementId)}
         className="w-full mt-4 btn-danger text-sm flex items-center justify-center"
@@ -896,5 +920,6 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
     </div>
   );
 };
+
 
 export default RoofEditor;
