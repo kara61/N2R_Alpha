@@ -7,4 +7,8 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ['lucide-react'],
   },
+  build: {
+    outDir: 'build/client',  // Tell Vite to output files to build/client
+    emptyOutDir: true        // Clean the output directory before each build
+  },
 });
