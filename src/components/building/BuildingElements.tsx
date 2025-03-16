@@ -66,16 +66,27 @@ const BuildingElements: React.FC<BuildingElementsProps> = ({ elements, dimension
             <boxGeometry args={[dimensions.width, dimensions.height, 0.05]} />
           </mesh>
           
-          {/* Door segments - horizontal lines */}
-          {[0.25, 0.5, 0.75].map((pos, idx) => (
-            <mesh 
-              key={`segment-${idx}`} 
-              position={[0, dimensions.height * (pos - 0.5), 0.06]} 
-              material={frameMaterial}
-            >
-              <boxGeometry args={[dimensions.width, 0.05, 0.01]} />
-            </mesh>
-          ))}
+          {/* Door segments - horizontal lines with proper scaling for taller doors */}
+          {(() => {
+            // Calculate number of segments based on door height
+            // More segments for taller doors
+            const segmentCount = Math.max(3, Math.min(6, Math.ceil(dimensions.height / 0.8)));
+            const segments = [];
+            
+            for (let i = 1; i < segmentCount; i++) {
+              const segmentPosition = -0.5 + (i / segmentCount);
+              segments.push(
+                <mesh 
+                  key={`segment-${i}`} 
+                  position={[0, dimensions.height * segmentPosition, 0.06]} 
+                  material={frameMaterial}
+                >
+                  <boxGeometry args={[dimensions.width, 0.05, 0.01]} />
+                </mesh>
+              );
+            }
+            return segments;
+          })()}
           
           {/* Windows - only for WindowedSectionalDoor */}
           {type === ElementType.WindowedSectionalDoor && (

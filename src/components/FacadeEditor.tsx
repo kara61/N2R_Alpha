@@ -935,8 +935,8 @@ const FacadeEditor: React.FC = () => {
     const elementDimensions = {
       [ElementType.Window]: { width: 1.2, height: 1.0, depth: 0.1 },
       [ElementType.Door]: { width: 1.0, height: 2.1, depth: 0.1 },
-      [ElementType.SectionalDoor]: { width: 3.0, height: 3.0, depth: 0.2 },
-      [ElementType.WindowedSectionalDoor]: { width: 3.0, height: 3.0, depth: 0.2 },
+      [ElementType.SectionalDoor]: { width: 3.0, height: 3.0, depth: 0.2 }, // Default remains 3.0 but can go up to 5.0
+      [ElementType.WindowedSectionalDoor]: { width: 3.0, height: 3.0, depth: 0.2 }, // Default remains 3.0 but can go up to 5.0
       [ElementType.LightBand]: { width: 2.0, height: 0.5, depth: 0.1 },
     };
 
@@ -1222,6 +1222,15 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ elementId, wall, 
   // Display value with offset for UI
   const displayBottomEdgeY = bottomEdgeY + yOffset;
   
+  // Get max height based on element type
+  const getMaxHeight = () => {
+    if (element.type === ElementType.SectionalDoor || 
+        element.type === ElementType.WindowedSectionalDoor) {
+      return 5.0; // Increased max height for sectional doors
+    }
+    return 3.0; // Default max height for other elements
+  };
+
   return (
     <div className="space-y-3 card-industrial p-3 rounded-lg">
       <div>
@@ -1295,7 +1304,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ elementId, wall, 
         <input
           type="range"
           min={0.5}
-          max={3}
+          max={getMaxHeight()} // Use dynamic max height
           step={0.1}
           value={element.dimensions.height}
           onChange={(e) => handleDimensionChange('height', parseFloat(e.target.value))}
@@ -1303,7 +1312,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ elementId, wall, 
         />
         <div className="flex justify-between text-xs text-light-gray mt-1">
           <span>0.5</span>
-          <span>3.0</span>
+          <span>{getMaxHeight()}</span> {/* Show proper max value */}
         </div>
       </div>
       

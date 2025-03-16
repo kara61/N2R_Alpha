@@ -82,6 +82,75 @@ const ElementControls: React.FC = () => {
     });
   };
   
+  const handleDimensionChange = (dimension: 'width' | 'height', value: number) => {
+    updateElement(selectedElementId, {
+      dimensions: {
+        ...selectedElement.dimensions,
+        [dimension]: value
+      }
+    });
+  };
+  
+  // Add height control UI
+  const renderDimensionControls = () => {
+    // Get max height based on element type
+    const getMaxHeight = () => {
+      if (selectedElement.type === 'SectionalDoor' || 
+          selectedElement.type === 'WindowedSectionalDoor') {
+        return 5.0; // Increased max height for sectional doors
+      }
+      return 3.0; // Default max height for other elements
+    };
+    
+    return (
+      <div>
+        <h4 className="text-sm font-medium flex items-center mb-1 text-light-gray">
+          Dimensions
+        </h4>
+        <div className="space-y-2">
+          <div className="flex items-center">
+            <label className="w-16 text-sm text-light-gray">Width:</label>
+            <input
+              type="range"
+              min={0.5}
+              max={5.0}
+              step={0.1}
+              value={selectedElement.dimensions.width}
+              onChange={(e) => handleDimensionChange('width', parseFloat(e.target.value))}
+              className="flex-1 mr-2 accent-accent-yellow"
+            />
+            <input
+              type="number"
+              value={selectedElement.dimensions.width.toFixed(1)}
+              onChange={(e) => handleDimensionChange('width', parseFloat(e.target.value))}
+              className="w-16 text-sm p-1 input-industrial"
+            />
+          </div>
+          <div className="flex items-center">
+            <label className="w-16 text-sm text-light-gray">Height:</label>
+            <input
+              type="range"
+              min={0.5}
+              max={getMaxHeight()}
+              step={0.1}
+              value={selectedElement.dimensions.height}
+              onChange={(e) => handleDimensionChange('height', parseFloat(e.target.value))}
+              className="flex-1 mr-2 accent-accent-yellow"
+            />
+            <input
+              type="number"
+              min={0.5}
+              max={getMaxHeight()}
+              value={selectedElement.dimensions.height.toFixed(1)}
+              onChange={(e) => handleDimensionChange('height', parseFloat(e.target.value))}
+              className="w-16 text-sm p-1 input-industrial"
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
+  
   const handleDelete = () => {
     removeElement(selectedElementId);
   };
@@ -254,6 +323,8 @@ const ElementControls: React.FC = () => {
             </div>
           </div>
         </div>
+        
+        {renderDimensionControls()}
       </div>
       
       <div className="mt-3 flex justify-end">
