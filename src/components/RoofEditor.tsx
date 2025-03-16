@@ -3,6 +3,93 @@ import { useBuildingStore } from '../store/buildingStore';
 import { RoofElementType, RoofType } from '../types';
 import { X, Move, ArrowLeft, Plus, Trash2, ZoomIn, ZoomOut, Maximize } from 'lucide-react';
 
+// Add this helper function at the top of the file (outside the component)
+function calculateRoofPosition(
+  canvasX: number, 
+  canvasY: number, 
+  canvas: HTMLCanvasElement,
+  roofType: RoofType,
+  dimensions: { length: number, width: number, height: number, roofPitch: number }
+) {
+  // Get roof dimensions
+  const roofLength = dimensions.length;
+  const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
+  
+  // Calculate different widths based on roof type
+  let roofWidth;
+  if (roofType === RoofType.Flat) {
+    roofWidth = dimensions.width;
+  } else if (roofType === RoofType.Gable) {
+    const slopeLength = Math.sqrt(Math.pow(dimensions.width / 2, 2) + Math.pow(roofHeight, 2));
+    roofWidth = slopeLength * 2;
+  } else { // Monopitch
+    roofWidth = Math.sqrt(Math.pow(dimensions.width, 2) + Math.pow(roofHeight, 2));
+  }
+  
+  // Scale factors for converting canvas coordinates to 3D positions
+  const scaleX = canvas.width / roofLength;
+  const scaleY = canvas.height / roofWidth;
+  
+  // Convert canvas coordinates to 3D positions
+  const x = (canvasX / scaleX) - (roofLength / 2);
+  
+  // Calculate z and y positions based on roof type
+  let z = 0, y = 0;
+  
+  if (roofType === RoofType.Flat) {
+    // For flat roof, direct mapping
+    z = (canvasY / scaleY) - (roofWidth / 2);
+    y = dimensions.height + 0.05; // Slightly above the roof
+  } 
+  else if (roofType === RoofType.Gable) {
+    // For gable roof, need special handling for ridge
+    if (canvasY < canvas.height / 2) {
+      // Front side of the roof
+      const distanceFromRidge = (canvas.height / 2 - canvasY) / scaleY;
+      z = -distanceFromRidge;
+      
+      // Calculate height along the slope
+      const halfWidth = dimensions.width / 2;
+      const ratio = Math.min(distanceFromRidge / halfWidth, 1);
+      y = dimensions.height + roofHeight - (ratio * roofHeight);
+    } else {
+      // Back side of the roof
+      const distanceFromRidge = (canvasY - canvas.height / 2) / scaleY;
+      z = distanceFromRidge;
+      
+      // Calculate height along the slope
+      const halfWidth = dimensions.width / 2;
+      const ratio = Math.min(distanceFromRidge / halfWidth, 1);
+      y = dimensions.height + roofHeight - (ratio * roofHeight);
+    }
+  } 
+  else { // Monopitch
+    // For monopitch roof, height varies linearly from high to low side
+    const distanceFromHighEdge = canvasY / scaleY;
+    z = (distanceFromHighEdge) - (roofWidth / 2);
+    
+    // Calculate height along the slope (high side = height + roofHeight, low side = height)
+    const ratio = Math.min(distanceFromHighEdge / dimensions.width, 1);
+    y = dimensions.height + roofHeight - (ratio * roofHeight);
+  }
+  
+  // Calculate rotation based on roof type to match the slope
+  let rotationX = 0;
+  
+  if (roofType === RoofType.Gable) {
+    const angle = Math.atan(roofHeight / (dimensions.width / 2));
+    rotationX = z < 0 ? angle : -angle; // Opposite angles on each side of ridge
+  }
+  else if (roofType === RoofType.Monopitch) {
+    rotationX = -Math.atan(roofHeight / dimensions.width);
+  }
+  
+  return { 
+    position: { x, y, z },
+    rotation: { x: rotationX, y: 0, z: 0 }
+  };
+}
+
 const RoofEditor: React.FC = () => {
   const { 
     dimensions, 
@@ -260,6 +347,7 @@ const RoofEditor: React.FC = () => {
     }
   };
   
+  // Replace the handleMouseMove function with this improved version for dragging
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!isDragging || !selectedRoofElementId) return;
     
@@ -270,82 +358,25 @@ const RoofEditor: React.FC = () => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     
-    // Convert canvas position to 3D position
-    const roofLength = dimensions.length;
-    let roofWidth;
-    
-    if (roofType === RoofType.Flat) {
-      roofWidth = dimensions.width;
-    } else if (roofType === RoofType.Gable) {
-      // For gable roof, calculate the sloped width
-      const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
-      const slopeLength = Math.sqrt(Math.pow(dimensions.width / 2, 2) + Math.pow(roofHeight, 2));
-      roofWidth = slopeLength * 2;
-    } else { // Monopitch
-      // For monopitch roof, calculate the sloped width
-      const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
-      roofWidth = Math.sqrt(Math.pow(dimensions.width, 2) + Math.pow(roofHeight, 2));
-    }
-    
-    const scaleX = canvas.width / roofLength;
-    const scaleY = canvas.height / roofWidth;
-    
-    // Get the element to update
+    // Get the element being dragged
     const element = roofElements.find(el => el.id === selectedRoofElementId);
     if (!element) return;
     
-    // Calculate new position based on roof type
-    let newPosition = { ...element.position };
+    // Calculate the new position and rotation
+    const { position, rotation } = calculateRoofPosition(
+      mouseX, 
+      mouseY, 
+      canvas, 
+      roofType, 
+      dimensions
+    );
     
-    // Map canvas x to 3D x position
-    newPosition.x = (mouseX / scaleX) - (roofLength / 2);
-    
-    // Map canvas y to 3D z position based on roof type
-    if (roofType === RoofType.Flat) {
-      newPosition.z = (mouseY / scaleY) - (roofWidth / 2);
-      newPosition.y = dimensions.height + 0.01;
-    } else if (roofType === RoofType.Gable) {
-      // For gable roof, need to map based on which side of the ridge
-      if (mouseY < canvas.height / 2) {
-        // Front side of roof
-        const distanceFromRidge = (canvas.height / 2 - mouseY) / scaleY;
-        newPosition.z = -distanceFromRidge;
-        
-        // Calculate Y position based on roof pitch
-        const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
-        const ridgeHeight = dimensions.height + roofHeight;
-        const ratio = distanceFromRidge / (dimensions.width / 2);
-        
-        // Linear interpolation between ridge height and eave height
-        newPosition.y = ridgeHeight - (ratio * roofHeight);
-      } else {
-        // Back side of roof
-        const distanceFromRidge = (mouseY - canvas.height / 2) / scaleY;
-        newPosition.z = distanceFromRidge;
-        
-        // Calculate Y position based on roof pitch
-        const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
-        const ridgeHeight = dimensions.height + roofHeight;
-        const ratio = distanceFromRidge / (dimensions.width / 2);
-        
-        // Linear interpolation between ridge height and eave height
-        newPosition.y = ridgeHeight - (ratio * roofHeight);
-      }
-    } else { // Monopitch
-      // For monopitch, map directly but adjust for the slope
-      newPosition.z = (mouseY / scaleY) - (roofWidth / 2);
-      
-      // Calculate Y position based on roof pitch
-      const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
-      const highSideHeight = dimensions.height + roofHeight;
-      const ratio = (newPosition.z + dimensions.width / 2) / dimensions.width;
-      
-      // Linear interpolation between high side and low side
-      newPosition.y = highSideHeight - (ratio * roofHeight);
-    }
-    
-    // Update element position
-    updateRoofElement(selectedRoofElementId, { position: newPosition });
+    // Update element with new position and rotation
+    updateRoofElement(selectedRoofElementId, { 
+      position, 
+      // Only update rotation for dome skylights, keep existing rotation for ridge skylights
+      rotation: element.type === RoofElementType.DomeSkylights ? rotation : element.rotation
+    });
   };
   
   const handleMouseUp = () => {
@@ -434,51 +465,40 @@ const RoofEditor: React.FC = () => {
     return null;
   };
 
-  // Add a dome skylight
+  // Replace the addDomeSkylight function with this improved version
   const addDomeSkylight = () => {
-    // Default position based on roof type
-    let position = { x: 0, y: 0, z: 0 };
-    let rotation = { x: 0, y: 0, z: 0 };
+    // Calculate a reasonable default position in the center of the roof
+    let position, rotation;
     
-    // Calculate Y position based on roof type
+    // Default position based on roof type
     if (roofType === RoofType.Flat) {
-      position.y = dimensions.height + 0.01;
-    } else if (roofType === RoofType.Gable) {
-      // For gable roof, place it on one side of the roof
+      position = { x: 0, y: dimensions.height + 0.05, z: 0 };
+      rotation = { x: 0, y: 0, z: 0 };
+    } 
+    else if (roofType === RoofType.Gable) {
+      // For gable roof, place on the front side of the roof
       const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
       const angle = Math.atan(roofHeight / (dimensions.width / 2));
-      const yOffset = Math.sin(angle) * (dimensions.width / 4);
       
-      position = {
-        x: 0,
-        y: dimensions.height + yOffset,
-        z: -dimensions.width / 4
+      position = { 
+        x: 0, 
+        y: dimensions.height + roofHeight * 0.5, // Halfway up the roof slope 
+        z: -dimensions.width / 4               // Quarter way from ridge to eave
       };
       
-      // Set rotation to match roof pitch
-      rotation = { 
-        x: angle, 
-        y: 0, 
-        z: 0 
-      };
-    } else if (roofType === RoofType.Monopitch) {
-      // For monopitch roof, place it in the middle
+      rotation = { x: angle, y: 0, z: 0 };     // Match the roof slope
+    } 
+    else { // Monopitch
       const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
       const angle = Math.atan(roofHeight / dimensions.width);
-      const yOffset = Math.sin(angle) * (dimensions.width / 2);
       
       position = {
         x: 0,
-        y: dimensions.height + yOffset / 2,
-        z: 0
+        y: dimensions.height + roofHeight * 0.5, // Halfway up the roof slope
+        z: 0                                   // Middle of the roof width
       };
       
-      // Set rotation to match roof pitch
-      rotation = { 
-        x: angle, 
-        y: 0, 
-        z: 0 
-      };
+      rotation = { x: -angle, y: 0, z: 0 };    // Match the roof slope
     }
     
     const newElement = {
@@ -486,7 +506,11 @@ const RoofEditor: React.FC = () => {
       type: RoofElementType.DomeSkylights,
       position,
       rotation,
-      dimensions: { width: 1.2, height: 0.5, depth: 1.2 },
+      dimensions: { 
+        width: 1.0,   // Diameter of the dome
+        height: 0.4,  // Height of the dome
+        depth: 0.1    // Base frame thickness
+      },
       material: {
         id: 'polycarbonate',
         name: 'Polycarbonate',
@@ -500,35 +524,39 @@ const RoofEditor: React.FC = () => {
     selectRoofElement(newElement.id);
   };
   
-  // Add a ridge skylight
+  // Replace the addRidgeSkylight function with this improved version
   const addRidgeSkylight = () => {
     // Default position based on roof type
-    let position = { x: 0, y: 0, z: 0 };
-    let rotation = { x: 0, y: 0, z: 0 };
+    let position, rotation;
     
-    // Calculate Y position based on roof type
     if (roofType === RoofType.Flat) {
-      position.y = dimensions.height + 0.01;
-    } else if (roofType === RoofType.Gable) {
-      // For gable roof, place it at the ridge
-      const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
-      position = {
-        x: 0,
-        y: dimensions.height + roofHeight,
-        z: 0
-      };
-      // Align with building length
+      // For flat roof, place in the middle
+      position = { x: 0, y: dimensions.height + 0.05, z: 0 };
       rotation = { x: 0, y: 0, z: 0 };
-    } else if (roofType === RoofType.Monopitch) {
-      // For monopitch roof, place it at the higher edge
+    } 
+    else if (roofType === RoofType.Gable) {
+      // For gable roof, place along the ridge
       const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
+      
       position = {
-        x: 0,
-        y: dimensions.height + roofHeight,
-        z: dimensions.width / 2
+        x: 0,                           // Center along the length
+        y: dimensions.height + roofHeight, // At the ridge height
+        z: 0                            // At the ridge position
       };
-      // Align with building length
-      rotation = { x: 0, y: 0, z: 0 };
+      
+      rotation = { x: 0, y: 0, z: 0 };  // No rotation needed along the ridge
+    } 
+    else { // Monopitch
+      // For monopitch roof, place along the high edge
+      const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
+      
+      position = {
+        x: 0,                           // Center along the length
+        y: dimensions.height + roofHeight, // At the high edge
+        z: -dimensions.width / 2        // At the high edge of the roof
+      };
+      
+      rotation = { x: 0, y: 0, z: 0 };  // No rotation needed for ridge element
     }
     
     const newElement = {
@@ -536,7 +564,11 @@ const RoofEditor: React.FC = () => {
       type: RoofElementType.RidgeSkylights,
       position,
       rotation,
-      dimensions: { width: 1.5, height: 0.5, depth: 1.5, length: 5 },
+      dimensions: { 
+        width: 1.0,   // Width of the skylight
+        height: 0.4,  // Height of the skylight
+        length: 3.0   // Length along the ridge
+      },
       material: {
         id: 'polycarbonate',
         name: 'Polycarbonate',
@@ -674,40 +706,77 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
   
   if (!element) return null;
   
-  const handlePositionChange = (axis: 'x' | 'y' | 'z', value: number) => {
+  // Replace the handlePositionChange with this improved version
+  const handlePositionChange = (axis: 'x' | 'z', value: number) => {
+    // Get current element
+    const element = roofElements.find(el => el.id === elementId);
+    if (!element) return;
+    
     const newPosition = { ...element.position };
+    const newRotation = { ...element.rotation };
     
     if (axis === 'x') {
+      // X position is simple - just update it
       newPosition.x = value;
-    } else if (axis === 'z') {
+    } 
+    else if (axis === 'z') {
+      // Z position needs to update Y as well, to stay on the roof surface
       newPosition.z = value;
       
-      // Update Y position based on roof type and new Z position
+      // Calculate Y position and rotation based on roof type
       if (roofType === RoofType.Flat) {
-        newPosition.y = buildingDimensions.height + 0.01;
-      } else if (roofType === RoofType.Gable) {
-        // For gable roof, calculate Y based on position relative to ridge
+        // For flat roof, Y is just the roof height
+        newPosition.y = buildingDimensions.height + 0.05;
+      } 
+      else if (roofType === RoofType.Gable) {
+        // For gable roof, Y depends on distance from ridge
         const roofHeight = buildingDimensions.width * (roofPitch / 100);
         const ridgeHeight = buildingDimensions.height + roofHeight;
-        const distanceFromCenter = Math.abs(value);
-        const ratio = distanceFromCenter / (buildingDimensions.width / 2);
+        const halfWidth = buildingDimensions.width / 2;
         
-        // Linear interpolation between ridge height and eave height
+        // Calculate distance from ridge
+        const distanceFromRidge = Math.abs(value);
+        
+        // Calculate ratio along the slope (0 at ridge, 1 at eave)
+        const ratio = Math.min(distanceFromRidge / halfWidth, 1);
+        
+        // Calculate Y position 
         newPosition.y = ridgeHeight - (ratio * roofHeight);
-      } else if (roofType === RoofType.Monopitch) {
-        // For monopitch roof, calculate Y based on position along the slope
+        
+        // Calculate rotation based on which side of the roof
+        if (element.type === RoofElementType.DomeSkylights) {
+          const angle = Math.atan(roofHeight / halfWidth);
+          newRotation.x = value < 0 ? angle : -angle;
+        }
+      } 
+      else { // Monopitch
+        // For monopitch, Y depends on position along the slope
         const roofHeight = buildingDimensions.width * (roofPitch / 100);
         const highSideHeight = buildingDimensions.height + roofHeight;
-        const ratio = (value + buildingDimensions.width / 2) / buildingDimensions.width;
         
-        // Linear interpolation between high side and low side
+        // Calculate ratio along the slope (0 at high side, 1 at low side)
+        const ratio = Math.min((value + buildingDimensions.width / 2) / buildingDimensions.width, 1);
+        
+        // Calculate Y position
         newPosition.y = highSideHeight - (ratio * roofHeight);
+        
+        // Calculate rotation for dome skylights
+        if (element.type === RoofElementType.DomeSkylights) {
+          const angle = Math.atan(roofHeight / buildingDimensions.width);
+          newRotation.x = -angle; // Same angle everywhere on monopitch
+        }
       }
-    } else if (axis === 'y') {
-      newPosition.y = value;
     }
     
-    updateRoofElement(elementId, { position: newPosition });
+    // Update with new position and rotation
+    const updates: Partial<RoofElement> = { position: newPosition };
+    
+    // Only update rotation for dome skylights
+    if (element.type === RoofElementType.DomeSkylights) {
+      updates.rotation = newRotation;
+    }
+    
+    updateRoofElement(elementId, updates);
   };
   
   const handleDimensionChange = (dim: 'width' | 'length', value: number) => {

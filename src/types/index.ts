@@ -29,6 +29,9 @@ export enum WallType {
 export enum RoofElementType {
   DomeSkylights = 'domeSkylights',
   RidgeSkylights = 'ridgeSkylights',
+  // We could add more roof element types in the future:
+  // VentilationUnit = 'ventilationUnit',
+  // SolarPanel = 'solarPanel',
 }
 
 export interface Material {
@@ -53,9 +56,22 @@ export interface BuildingElement {
 export interface RoofElement {
   id: string;
   type: RoofElementType;
-  position: { x: number; y: number; z: number };
-  rotation: { x: number; y: number; z: number };
-  dimensions: { width: number; height: number; depth?: number; length?: number };
+  position: { 
+    x: number; // Position along building length
+    y: number; // Height above ground level
+    z: number; // Position along building width
+  };
+  rotation: { 
+    x: number; // Pitch (to match roof slope)
+    y: number; // Yaw (to orient along ridge or roof surface)
+    z: number; // Roll (rarely used)
+  };
+  dimensions: { 
+    width: number;   // For dome: diameter; for ridge: width perpendicular to ridge
+    height: number;  // Height of the element above roof surface
+    depth?: number;  // Optional depth parameter
+    length?: number; // Used for ridge skylights: length along ridge
+  };
   material: Material;
 }
 

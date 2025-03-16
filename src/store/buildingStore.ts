@@ -115,8 +115,8 @@ export const useBuildingStore = create<BuildingState>((set, get) => ({
   selectedWall: WallType.North,
   showFacadeEditor: false,
   showRoofEditor: false,
-  facadeColorId: 'ral9002', // Default Grey White
-  roofColorId: 'ral7016', // Default Anthracite Grey
+  facadeColorId: 'ral9007', // Changed from ral9002 to ral9007 (Grey Aluminium)
+  roofColorId: 'ral9007',   // Changed from ral7016 to ral9007 (Grey Aluminium)
   stats: {
     roofArea: 0,
     wallArea: 0,

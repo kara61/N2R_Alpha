@@ -57,3 +57,9 @@ export const getRoofColors = () => ralColors.filter(color =>
 // Get color by ID
 export const getColorById = (id: string) => 
   ralColors.find(color => color.id === id);
+
+// Added function to get hex color value by ID
+export const getRalColorByHex = (id: string): string | undefined => {
+  const color = ralColors.find(color => color.id === id);
+  return color?.hex;
+};
