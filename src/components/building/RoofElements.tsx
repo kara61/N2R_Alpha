@@ -19,7 +19,7 @@ const RoofElements: React.FC<RoofElementsProps> = ({
   roofType,
   roofPitch
 }) => {
-  // Update materials to make glass more visible
+  // Update materials to enhance frame appearance
   const materials = useMemo(() => {
     return {
       // Significantly more visible glass material with higher opacity and blue tint
@@ -34,11 +34,12 @@ const RoofElements: React.FC<RoofElementsProps> = ({
         clearcoatRoughness: 0.1,
         side: THREE.DoubleSide
       }),
-      // Brighter and more pronounced frame material
+      // More metallic frame material for bands
       frame: new THREE.MeshStandardMaterial({
-        color: '#cccccc', // Lighter aluminum color
-        roughness: 0.3,
-        metalness: 0.9 // Higher metalness for better contrast
+        color: '#aaaaaa', // Silver-gray aluminum color
+        roughness: 0.2, // More polish
+        metalness: 0.9, // Very metallic
+        envMapIntensity: 1.5 // Enhance reflections
       })
     };
   }, []);
@@ -114,21 +115,42 @@ const RoofElements: React.FC<RoofElementsProps> = ({
     );
   };
 
-  // Completely simplified renderRidgeSkylight - just a single arch with no base or end caps
+  // Fixed renderRidgeSkylight function with metal bands
   const renderRidgeSkylight = (element: RoofElement) => {
     const { id, position, rotation, dimensions } = element;
-    const width = dimensions.width;
+    const width = dimensions.width || 1.0;
     const length = dimensions.length || 3;
     const height = dimensions.height || 0.4;
-
+    
+    // Calculate the number of metal bands (one every 2 meters, plus end caps)
+    const bandSpacing = 2; // 2 meters between bands
+    const numBands = Math.max(3, Math.floor(length / bandSpacing) + 2); // At least 3 bands
+    
+    // Create an array of band positions (normalized from 0 to 1)
+    const bandPositions = [];
+    for (let i = 0; i < numBands; i++) {
+      if (numBands === 2) {
+        // If only 2 bands, place them at the ends
+        bandPositions.push(i === 0 ? 0 : 1);
+      } else {
+        // Otherwise, evenly space them
+        bandPositions.push(i / (numBands - 1));
+      }
+    }
+    
+    console.log(`Creating ridge skylight with ${numBands} metal bands over ${length}m length`);
+    
+    // Calculate band thickness as a proportion of the arch height
+    const bandWidth = 0.06; // 6cm band width
+  
     return (
       <group 
         key={id} 
         position={[position.x, position.y, position.z]}
         rotation={[rotation.x, rotation.y, rotation.z]}
-        userData={{ isRoofElement: true, id: id }}
+        userData={{ isRoofElement: true, id }}
       >
-        {/* Only the main arch - no base, no end caps */}
+        {/* Main glass arch */}
         <group scale={[1, 0.5, 1]}>
           <mesh 
             position={[0, height/2, 0]} 
@@ -141,6 +163,45 @@ const RoofElements: React.FC<RoofElementsProps> = ({
             />
           </mesh>
         </group>
+        
+        {/* Metal bands */}
+        {bandPositions.map((pos, index) => (
+          <group 
+            key={`band-${index}`} 
+            position={[((pos - 0.5) * length), 0, 0]}
+            scale={[1, 0.5, 1]}
+          >
+            {/* Each band is a thin section of the same arch */}
+            <mesh
+              position={[0, height/2, 0]} 
+              rotation={[0, 0, Math.PI/2]} 
+              material={materials.frame}
+              receiveShadow
+              castShadow
+            >
+              <cylinderGeometry 
+                args={[
+                  height + 0.01, // Slightly larger radius than the glass
+                  height + 0.01, 
+                  bandWidth, // Narrow width for the band
+                  16, // Fewer segments for better performance
+                  1, false, 0, Math.PI
+                ]} 
+              />
+            </mesh>
+            
+            {/* Add a small cap at the top of each band for better appearance */}
+            <mesh
+              position={[0, height + 0.02, 0]}
+              rotation={[Math.PI/2, 0, 0]}
+              material={materials.frame}
+              receiveShadow
+              castShadow
+            >
+              <boxGeometry args={[bandWidth, 0.04, 0.05]} />
+            </mesh>
+          </group>
+        ))}
       </group>
     );
   };
