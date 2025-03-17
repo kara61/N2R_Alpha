@@ -4,7 +4,8 @@ import Viewport3D from './components/Viewport3D';
 import ElementControls from './components/ElementControls';
 import FacadeEditor from './components/FacadeEditor';
 import RoofElementControls from './components/RoofElementControls';
-import RoofEditor from './components/RoofEditor';
+// Replace direct import with dispatcher
+import RoofEditorDispatcher from './components/RoofEditorDispatcher';
 import { useBuildingStore } from './store/buildingStore';
 
 function App() {
@@ -29,7 +30,7 @@ function App() {
         {selectedElementId && !showFacadeEditor && !showRoofEditor && <ElementControls />}
         {selectedRoofElementId && !showFacadeEditor && !showRoofEditor && <RoofElementControls />}
         {showFacadeEditor && <FacadeEditor />}
-        {showRoofEditor && <RoofEditor />}
+        {showRoofEditor && <RoofEditorDispatcher />}
       </div>
     </div>
   );

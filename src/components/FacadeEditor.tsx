@@ -1231,6 +1231,14 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ elementId, wall, 
     return 3.0; // Default max height for other elements
   };
 
+  // Add a new function to get max width based on element type
+  const getMaxWidth = () => {
+    if (element.type === ElementType.LightBand) {
+      return 35.0; // Allow light bands to be up to 35m wide
+    }
+    return 5.0; // Default max width for other elements
+  };
+
   return (
     <div className="space-y-3 card-industrial p-3 rounded-lg">
       <div>
@@ -1287,7 +1295,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ elementId, wall, 
         <input
           type="range"
           min={0.5}
-          max={5}
+          max={getMaxWidth()} // Use dynamic max width
           step={0.1}
           value={element.dimensions.width}
           onChange={(e) => handleDimensionChange('width', parseFloat(e.target.value))}
@@ -1295,7 +1303,7 @@ const ElementProperties: React.FC<ElementPropertiesProps> = ({ elementId, wall, 
         />
         <div className="flex justify-between text-xs text-light-gray mt-1">
           <span>0.5</span>
-          <span>5.0</span>
+          <span>{getMaxWidth()}</span> {/* Show the actual max width */}
         </div>
       </div>
       

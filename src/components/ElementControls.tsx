@@ -91,9 +91,16 @@ const ElementControls: React.FC = () => {
     });
   };
   
-  // Add height control UI
+  // Update the renderDimensionControls function with fixed 35m max width for light bands
   const renderDimensionControls = () => {
-    // Get max height based on element type
+    // Get max width and height based on element type
+    const getMaxWidth = () => {
+      if (selectedElement.type === 'LightBand') {
+        return 35.0; // Fixed 35m max width for light bands
+      }
+      return 5.0; // Default max width for other elements
+    };
+    
     const getMaxHeight = () => {
       if (selectedElement.type === 'SectionalDoor' || 
           selectedElement.type === 'WindowedSectionalDoor') {
@@ -113,7 +120,7 @@ const ElementControls: React.FC = () => {
             <input
               type="range"
               min={0.5}
-              max={5.0}
+              max={getMaxWidth()} // Use dynamic max width
               step={0.1}
               value={selectedElement.dimensions.width}
               onChange={(e) => handleDimensionChange('width', parseFloat(e.target.value))}
@@ -121,6 +128,9 @@ const ElementControls: React.FC = () => {
             />
             <input
               type="number"
+              min={0.5}
+              max={getMaxWidth()} // Also update the number input max
+              step={0.1}
               value={selectedElement.dimensions.width.toFixed(1)}
               onChange={(e) => handleDimensionChange('width', parseFloat(e.target.value))}
               className="w-16 text-sm p-1 input-industrial"
