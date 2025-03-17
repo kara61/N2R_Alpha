@@ -132,6 +132,17 @@ export const useBuildingStore = create<BuildingState>((set, get) => ({
   setDimensions: (dimensions) => 
     set((state) => {
       const newDimensions = { ...state.dimensions, ...dimensions };
+      
+      // If roof type is changing to monopitch and pitch is not explicitly set,
+      // update the default pitch to 12%
+      if (
+        dimensions.roofType === RoofType.Monopitch && 
+        state.dimensions.roofType !== RoofType.Monopitch &&
+        dimensions.roofPitch === undefined
+      ) {
+        newDimensions.roofPitch = 12; // Set 12% pitch default for monopitch
+      }
+      
       return { dimensions: newDimensions };
     }),
 
