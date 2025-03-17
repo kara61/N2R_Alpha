@@ -39,7 +39,7 @@ function calculateRoofPosition(
   if (roofType === RoofType.Flat) {
     // For flat roof, direct mapping
     z = (canvasY / scaleY) - (roofWidth / 2);
-    y = dimensions.height + 0.1; // Double the offset
+    y = dimensions.height + 0.05; // Slightly above the roof
   } 
   else if (roofType === RoofType.Gable) {
     // For gable roof, need special handling for ridge
@@ -62,7 +62,7 @@ function calculateRoofPosition(
       const ratio = Math.min(distanceFromRidge / halfWidth, 1);
       y = dimensions.height + roofHeight - (ratio * roofHeight);
     }
-    y += 0.1; // Double the offset for better visibility
+    y += 0.05;
   } 
   else { // Monopitch
     // For monopitch roof, height varies linearly from high to low side
@@ -72,7 +72,7 @@ function calculateRoofPosition(
     // Calculate height along the slope (high side = height + roofHeight, low side = height)
     const ratio = Math.min(distanceFromHighEdge / dimensions.width, 1);
     y = dimensions.height + roofHeight - (ratio * roofHeight);
-    y += 0.1; // Double the offset for better visibility
+    y += 0.05;
   }
   
   // Calculate rotation based on roof type to match the slope
@@ -307,24 +307,27 @@ const RoofEditor: React.FC = () => {
       // Draw element with industrial style
       ctx.fillStyle = fillColor;
       
-      // Draw the element as a square without grid lines for window
+      // Draw the element as a square with grid lines to represent window panes
       if (element.type === RoofElementType.RoofWindow) {
-        // Draw the main square with frame
+        // Draw the main square
+        ctx.fillRect(x - width / 2, y - height / 2, width, height);
+        
+        // Draw outline
         ctx.strokeStyle = strokeColor;
         ctx.lineWidth = element.id === selectedRoofElementId ? 3 : 2;
         ctx.strokeRect(x - width / 2, y - height / 2, width, height);
         
-        // Draw a slightly smaller filled rectangle to represent the glass
-        const glassInset = 4; // pixels inset for the glass part
-        ctx.fillStyle = fillColor;
-        ctx.fillRect(
-          x - width / 2 + glassInset, 
-          y - height / 2 + glassInset, 
-          width - glassInset * 2, 
-          height - glassInset * 2
-        );
-        
-        // Remove the grid lines - we don't want to draw them anymore
+        // Draw grid lines to show it's a window with panes
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        // Horizontal divider
+        ctx.moveTo(x - width / 2, y);
+        ctx.lineTo(x + width / 2, y);
+        // Vertical divider
+        ctx.moveTo(x, y - height / 2);
+        ctx.lineTo(x, y + height / 2);
+        ctx.stroke();
       } else {
         // Ridge skylights remain the same
         ctx.fillRect(x - width / 2, y - height / 2, width, height);
@@ -357,12 +360,15 @@ const RoofEditor: React.FC = () => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     
-    // Check if mouse is over an element
+    // Check if mouse is over an element with wider hit area for easier selection
     const clickedElement = findElementAtPosition(mouseX, mouseY);
     
     if (clickedElement) {
       selectRoofElement(clickedElement.id);
       setIsDragging(true);
+      
+      // Log for debugging
+      console.log(`Started dragging element ${clickedElement.id}`);
     } else {
       selectRoofElement(null);
     }
@@ -370,6 +376,7 @@ const RoofEditor: React.FC = () => {
   
   // Replace the handleMouseMove function with this improved version for dragging
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Skip if we're not dragging or no element is selected
     if (!isDragging || !selectedRoofElementId) return;
     
     const canvas = canvasRef.current;
@@ -383,7 +390,7 @@ const RoofEditor: React.FC = () => {
     const element = roofElements.find(el => el.id === selectedRoofElementId);
     if (!element) return;
     
-    // Calculate the new position and rotation
+    // Calculate new position and rotation based on mouse position
     const { position, rotation } = calculateRoofPosition(
       mouseX, 
       mouseY, 
@@ -392,15 +399,28 @@ const RoofEditor: React.FC = () => {
       dimensions
     );
     
-    // Always update both position and rotation for roof windows to match the roof
-    // For ridge skylights, only update position (keep original rotation)
-    updateRoofElement(selectedRoofElementId, { 
-      position, 
-      rotation: element.type === RoofElementType.RoofWindow ? rotation : element.rotation
-    });
+    // Log the drag operation for debugging
+    console.log(`Dragging to new position: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
+    
+    // Apply updates based on element type
+    if (element.type === RoofElementType.RoofWindow) {
+      // For roof windows, update both position and rotation to match the roof slope
+      updateRoofElement(selectedRoofElementId, { position, rotation });
+    } else {
+      // For ridge skylights, only update x and z position (keep y and rotation)
+      const newPosition = {
+        x: position.x,
+        y: element.position.y, // Keep original y position
+        z: position.z
+      };
+      updateRoofElement(selectedRoofElementId, { position: newPosition });
+    }
   };
   
   const handleMouseUp = () => {
+    if (isDragging && selectedRoofElementId) {
+      console.log(`Finished dragging element ${selectedRoofElementId}`);
+    }
     setIsDragging(false);
   };
   
@@ -430,7 +450,9 @@ const RoofEditor: React.FC = () => {
     const scaleX = canvas.width / roofLength;
     const scaleY = canvas.height / roofWidth;
     
-    // Check each element
+    // Check each element with a slightly expanded hit area
+    const hitAreaExpansion = 10; // pixels - increased for easier selection
+    
     for (const element of roofElements) {
       // Convert 3D position to 2D roof position
       let elementX, elementY;
@@ -471,10 +493,10 @@ const RoofEditor: React.FC = () => {
       
       // Check if mouse is inside element - all elements use the same hit test now
       if (
-        x >= elementX - width / 2 &&
-        x <= elementX + width / 2 &&
-        y >= elementY - height / 2 &&
-        y <= elementY + height / 2
+        x >= elementX - width / 2 - hitAreaExpansion &&
+        x <= elementX + width / 2 + hitAreaExpansion &&
+        y >= elementY - height / 2 - hitAreaExpansion &&
+        y <= elementY + height / 2 + hitAreaExpansion
       ) {
         return element;
       }
@@ -485,60 +507,82 @@ const RoofEditor: React.FC = () => {
 
   // Fix the addRoofWindow function to properly set initial position and rotation
   const addRoofWindow = () => {
-    // Default position based on roof type
-    let position, rotation;
+    // Get existing roof windows to determine where to place the new one
+    const existingWindows = roofElements.filter(el => el.type === RoofElementType.RoofWindow);
+    const windowCount = existingWindows.length;
     
-    // Position the roof window based on roof type and ensure it lies flat on the roof
+    // Only vary the X position based on count, to prevent stacking
+    const xOffset = windowCount * 2 - (Math.floor(windowCount / 3) * 6);
+    
+    // Calculate default Z position based on roof type
+    let zPosition = 0;
+    let yPosition = 0;
+    let xRotation = 0;
+    
     if (roofType === RoofType.Flat) {
-      position = { x: 0, y: dimensions.height + 0.1, z: 0 }; // Double the offset
-      rotation = { x: 0, y: 0, z: 0 }; // Flat roof = no rotation
+      // For flat roof, place at center Z
+      zPosition = 0;
+      yPosition = dimensions.height + 0.1; // 10cm above roof
+      xRotation = 0; // No rotation
     } 
     else if (roofType === RoofType.Gable) {
-      // For gable roof, place on the front side of the roof with proper pitch
+      // For gable roof, place on front slope
       const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
       const angle = Math.atan(roofHeight / (dimensions.width / 2));
       
-      // Place on front side (negative Z value)
-      position = { 
-        x: 0, 
-        y: dimensions.height + roofHeight * 0.5 + 0.1, // Double the offset
-        z: -dimensions.width / 4                // Quarter way from ridge to eave
-      };
+      zPosition = -dimensions.width / 4; // 1/4 of the way from ridge to eave
       
-      // IMPORTANT: On the front side (negative Z), we need a negative rotation
-      rotation = { x: -angle, y: 0, z: 0 };
+      // Calculate Y position to be on the roof slope
+      const distanceFromRidge = Math.abs(zPosition);
+      const halfWidth = dimensions.width / 2;
+      const ratio = distanceFromRidge / halfWidth;
+      yPosition = dimensions.height + roofHeight - (ratio * roofHeight) + 0.1;
+      
+      xRotation = -angle; // Negative rotation for front slope
     } 
     else { // Monopitch
+      // For monopitch, place in the middle of the slope
       const roofHeight = dimensions.width * (dimensions.roofPitch / 100);
       const angle = Math.atan(roofHeight / dimensions.width);
       
-      position = {
-        x: 0,
-        y: dimensions.height + roofHeight * 0.5 + 0.1, // Double the offset
-        z: 0                                   // Middle of the roof width
-      };
+      zPosition = 0; // Middle of roof width
       
-      rotation = { x: -angle, y: 0, z: 0 };    // Match the roof slope (negative because of direction)
+      // Calculate Y position for this Z
+      yPosition = dimensions.height + (roofHeight / 2) + 0.1;
+      
+      xRotation = -angle; // Match roof slope
     }
     
+    // Create the new element
     const newElement = {
       id: `roof-window-${Date.now()}`,
       type: RoofElementType.RoofWindow,
-      position,
-      rotation,
+      position: {
+        x: xOffset,
+        y: yPosition,
+        z: zPosition
+      },
+      rotation: {
+        x: xRotation,
+        y: 0,
+        z: 0
+      },
       dimensions: { 
-        width: 1.3,   // Fixed width - not adjustable
-        height: 0.08, // Thicker for better visibility
-        length: 1.3   // Fixed length - not adjustable
+        width: 1.3,   // Fixed dimensions
+        height: 0.08, 
+        length: 1.3   
       },
       material: {
         id: 'glass',
         name: 'Glass',
-        color: '#78c8ff', // Brighter blue
+        color: '#78c8ff',
         roughness: 0.1,
         metalness: 0.3,
       }
     };
+    
+    // Log the new element for debugging
+    console.log(`Adding new roof window at: (${newElement.position.x.toFixed(2)}, ${newElement.position.y.toFixed(2)}, ${newElement.position.z.toFixed(2)})`);
     
     addRoofElement(newElement);
     selectRoofElement(newElement.id);
@@ -748,7 +792,7 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
       // Calculate Y position and rotation based on roof type
       if (roofType === RoofType.Flat) {
         // For flat roof, Y is just the roof height
-        newPosition.y = buildingDimensions.height + 0.1; // Increased offset
+        newPosition.y = buildingDimensions.height + 0.05; // Half of window thickness
       } 
       else if (roofType === RoofType.Gable) {
         // For gable roof, Y depends on distance from ridge
@@ -772,7 +816,7 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
           // FIXED: Front slope (negative Z) gets negative angle, back slope (positive Z) gets positive angle
           newRotation.x = value < 0 ? -angle : angle;
         }
-        newPosition.y += 0.1; // Add a larger offset to the final Y position
+        newPosition.y += 0.05;
       } 
       else { // Monopitch
         // For monopitch, Y depends on position along the slope
@@ -790,7 +834,7 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
           const angle = Math.atan(roofHeight / buildingDimensions.width);
           newRotation.x = -angle; // Same angle everywhere on monopitch
         }
-        newPosition.y += 0.1; // Add a larger offset to the final Y position
+        newPosition.y += 0.05;
       }
     }
     
