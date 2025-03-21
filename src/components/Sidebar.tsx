@@ -115,8 +115,8 @@ const Sidebar: React.FC = () => {
               <div className="flex items-center">
                 <input
                   type="range"
-                  min="5"
-                  max="50"
+                  min={dimensions.roofType === RoofType.Monopitch ? 0 : 5} // Changed from 5 to 0 for monopitch
+                  max={dimensions.roofType === RoofType.Monopitch ? 30 : 45}
                   step="1"
                   value={dimensions.roofPitch}
                   onChange={(e) => setDimensions({ roofPitch: Number(e.target.value) })}
@@ -124,8 +124,8 @@ const Sidebar: React.FC = () => {
                 />
                 <input
                   type="number"
-                  min="5"
-                  max="50"
+                  min={dimensions.roofType === RoofType.Monopitch ? 0 : 5} // Changed from 5 to 0 for monopitch
+                  max={dimensions.roofType === RoofType.Monopitch ? 30 : 45}
                   value={dimensions.roofPitch}
                   onChange={(e) => setDimensions({ roofPitch: Number(e.target.value) })}
                   className="w-16 text-sm p-1 input-industrial"
