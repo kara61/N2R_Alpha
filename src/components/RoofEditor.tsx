@@ -293,9 +293,9 @@ const RoofEditor: React.FC = () => {
         width = (element.dimensions.length || 3) * scaleX;
         height = element.dimensions.width * scaleY;
       } else if (element.type === RoofElementType.RoofWindow) {
-        // Fixed size for roof windows: 1.3m x 1.3m
-        width = 1.3 * scaleX;
-        height = 1.3 * scaleY;
+        // Proper dimensions for roof windows
+        width = (element.dimensions.length || 1.3) * scaleX;
+        height = (element.dimensions.width || 1.3) * scaleY;
       }
       
       // Set colors based on element type - industrial theme
@@ -387,7 +387,7 @@ const RoofEditor: React.FC = () => {
     // No drag handling needed
   };
   
-  // Helper function to find element at mouse position
+  // Helper function to find element at mouse position - fixed for RoofWindow type
   const findElementAtPosition = (x: number, y: number) => {
     const canvas = canvasRef.current;
     if (!canvas) return null;
@@ -442,14 +442,18 @@ const RoofEditor: React.FC = () => {
         elementY = (element.position.z + roofWidth / 2) * scaleY;
       }
       
-      // Element dimensions - Fixed dimensions for dome skylights
+      // Element dimensions - FIXED to handle all element types correctly
       let width, height;
       
       if (element.type === RoofElementType.RidgeSkylights) {
         width = (element.dimensions.length || 3) * scaleX;
         height = element.dimensions.width * scaleY;
-      } else if (element.type === RoofElementType.DomeSkylights) {
-        // Fixed dimensions for dome skylights
+      } else if (element.type === RoofElementType.RoofWindow) {
+        // Proper dimensions for roof windows
+        width = (element.dimensions.length || 1.3) * scaleX;
+        height = (element.dimensions.width || 1.3) * scaleY;
+      } else {
+        // Default fallback
         width = 1.3 * scaleX;
         height = 1.3 * scaleY;
       }
@@ -461,6 +465,7 @@ const RoofEditor: React.FC = () => {
         y >= elementY - height / 2 - hitAreaExpansion &&
         y <= elementY + height / 2 + hitAreaExpansion
       ) {
+        console.log(`Found element ${element.id} at (${elementX}, ${elementY}), mouse at (${x}, ${y})`);
         return element;
       }
     }
@@ -742,15 +747,46 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
     const newPosition = { ...element.position };
     newPosition[axis] = value;
     
+    // For any Z position change, we need to recalculate Y position for proper roof placement
+    if (axis === 'z') {
+      // Calculate a new Y position based on the roof type and Z position
+      if (roofType === RoofType.Gable) {
+        const roofHeight = buildingDimensions.width * (roofPitch / 100);
+        const ridgeHeight = buildingDimensions.height + roofHeight;
+        const halfWidth = buildingDimensions.width / 2;
+        
+        // Calculate distance from ridge
+        const distanceFromRidge = Math.abs(value);
+        
+        // Calculate ratio along the slope (0 at ridge, 1 at eave)
+        const ratio = Math.min(distanceFromRidge / halfWidth, 1);
+        
+        // IMPORTANT: Calculate Y position to follow the roof slope
+        // ridgeHeight at ridge, ridgeHeight - roofHeight at eave
+        newPosition.y = ridgeHeight - (ratio * roofHeight) + 0.05; // 5cm above the roof surface
+        
+        console.log(`Recalculated Y position: ${newPosition.y.toFixed(2)} for Z: ${value.toFixed(2)}`);
+      } 
+      else if (roofType === RoofType.Monopitch) {
+        const roofHeight = buildingDimensions.width * (roofPitch / 100);
+        const highSideHeight = buildingDimensions.height + roofHeight;
+        
+        // Calculate ratio along the slope (0 at high side, 1 at low side)
+        const ratio = Math.min((value + buildingDimensions.width / 2) / buildingDimensions.width, 1);
+        
+        // Calculate Y position
+        newPosition.y = highSideHeight - (ratio * roofHeight) + 0.05;
+      }
+    }
+    
     const updates: any = { position: newPosition };
     
-    // If we're changing Z position on a gable roof, adjust the rotation angle to match the roof slope
+    // Handle rotation update for gable roof
     if (axis === 'z' && roofType === RoofType.Gable && element.type === RoofElementType.RoofWindow) {
       const roofHeight = buildingDimensions.width * (roofPitch / 100);
       const angle = Math.atan(roofHeight / (buildingDimensions.width / 2));
       
       // Determine side of roof based on z position and adjust rotation accordingly
-      // Front slope (negative Z) gets negative angle, back slope (positive Z) gets positive angle
       const newRotation = { ...element.rotation };
       newRotation.x = value < 0 ? -angle : angle;
       
@@ -763,7 +799,7 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
     // Update element position and potentially rotation
     updateRoofElement(elementId, updates);
     
-    console.log(`Updated ${axis} position to ${value}`);
+    console.log(`Updated ${axis} position to ${value}, new Y: ${newPosition.y.toFixed(2)}`);
   };
   
   const handleDimensionChange = (dim: 'width' | 'length', value: number) => {
