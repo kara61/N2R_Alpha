@@ -105,13 +105,17 @@ const useRoofPositioning = (dimensions: HallDimensions): RoofPositioningLogic =>
         rotation.x = -Math.atan(roofHeight / dimensions.width);
       }
       
-      // Create the new roof window element
+      // Create the new roof window element with width, height and length
       return {
         id: `roof-window-${Date.now()}`,
         type: RoofElementType.RoofWindow,
         position,
         rotation,
-        dimensions: { width: 1.3, height: 0.08, length: 1.3 },
+        dimensions: { 
+          width: 1.3,  // Default width
+          height: 0.08, 
+          length: 1.3  // Default length - can be adjusted up to 35m
+        },
         material: {
           id: 'glass',
           name: 'Glass',

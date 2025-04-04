@@ -1,7 +1,6 @@
 import React from 'react';
 import { useBuildingStore } from '../store/buildingStore';
 import RoofEditor from './RoofEditor';
-import useRoofPositioning from '../hooks/useRoofPositioning';
 
 /**
  * RoofEditorDispatcher acts as a mediator between the RoofEditor component
@@ -14,7 +13,11 @@ const RoofEditorDispatcher: React.FC = () => {
     toggleRoofEditor, 
     dimensions, 
     roofElements,
-    selectRoofElement
+    selectedRoofElementId,
+    selectRoofElement,
+    updateRoofElement,
+    removeRoofElement,
+    addRoofElement
   } = useBuildingStore();
   
   // Skip rendering if the roof editor is not visible
@@ -22,22 +25,15 @@ const RoofEditorDispatcher: React.FC = () => {
     return null;
   }
   
-  // Get the roof positioning logic using the custom hook
-  const positioningLogic = useRoofPositioning(dimensions);
-  
   // Handle closing the roof editor
   const handleClose = () => {
     toggleRoofEditor(false);
     selectRoofElement(null); // Deselect any selected roof element
   };
   
-  // Render the RoofEditor with the necessary props
-  return (
-    <RoofEditor 
-      positioningLogic={positioningLogic}
-      onClose={handleClose}
-    />
-  );
+  // Render the RoofEditor directly with all necessary props
+  // No need for positioningLogic hook anymore since we don't use drag positioning
+  return <RoofEditor onClose={handleClose} />;
 };
 
 export default RoofEditorDispatcher;

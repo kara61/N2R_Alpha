@@ -351,7 +351,7 @@ const RoofEditor: React.FC = () => {
     drawCanvas();
   }, [drawCanvas, dimensions, roofElements, selectedRoofElementId]);
   
-  // Handle mouse events for dragging elements
+  // Handle mouse events for selecting elements
   const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -360,68 +360,31 @@ const RoofEditor: React.FC = () => {
     const mouseX = e.clientX - rect.left;
     const mouseY = e.clientY - rect.top;
     
-    // Check if mouse is over an element with wider hit area for easier selection
+    // Check if mouse is over an element and select it if found
     const clickedElement = findElementAtPosition(mouseX, mouseY);
     
     if (clickedElement) {
+      console.log(`Selected element ${clickedElement.id}`);
       selectRoofElement(clickedElement.id);
-      setIsDragging(true);
-      
-      // Log for debugging
-      console.log(`Started dragging element ${clickedElement.id}`);
     } else {
+      // Only deselect if clicking empty space
       selectRoofElement(null);
     }
   };
   
-  // Replace the handleMouseMove function with this improved version for dragging
+  // Remove or simplify handleMouseMove - no need for dragging logic
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Skip if we're not dragging or no element is selected
-    if (!isDragging || !selectedRoofElementId) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-    
-    // Get the element being dragged
-    const element = roofElements.find(el => el.id === selectedRoofElementId);
-    if (!element) return;
-    
-    // Calculate new position and rotation based on mouse position
-    const { position, rotation } = calculateRoofPosition(
-      mouseX, 
-      mouseY, 
-      canvas, 
-      roofType, 
-      dimensions
-    );
-    
-    // Log the drag operation for debugging
-    console.log(`Dragging to new position: (${position.x.toFixed(2)}, ${position.y.toFixed(2)}, ${position.z.toFixed(2)})`);
-    
-    // Apply updates based on element type
-    if (element.type === RoofElementType.RoofWindow) {
-      // For roof windows, update both position and rotation to match the roof slope
-      updateRoofElement(selectedRoofElementId, { position, rotation });
-    } else {
-      // For ridge skylights, only update x and z position (keep y and rotation)
-      const newPosition = {
-        x: position.x,
-        y: element.position.y, // Keep original y position
-        z: position.z
-      };
-      updateRoofElement(selectedRoofElementId, { position: newPosition });
-    }
+    // No dragging logic needed
+    // We could add hover effects here if desired
   };
   
+  // Simplify handleMouseUp and handleMouseLeave - no need for drag handling
   const handleMouseUp = () => {
-    if (isDragging && selectedRoofElementId) {
-      console.log(`Finished dragging element ${selectedRoofElementId}`);
-    }
-    setIsDragging(false);
+    // No drag handling needed
+  };
+  
+  const handleMouseLeave = () => {
+    // No drag handling needed
   };
   
   // Helper function to find element at mouse position
@@ -553,7 +516,7 @@ const RoofEditor: React.FC = () => {
       xRotation = -angle; // Match roof slope
     }
     
-    // Create the new element
+    // Create the new element with width and length properties
     const newElement = {
       id: `roof-window-${Date.now()}`,
       type: RoofElementType.RoofWindow,
@@ -568,9 +531,9 @@ const RoofEditor: React.FC = () => {
         z: 0
       },
       dimensions: { 
-        width: 1.3,   // Fixed dimensions
-        height: 0.08, 
-        length: 1.3   
+        width: 1.3,    // Default width
+        height: 0.08,  // Fixed height
+        length: 1.3    // Default length (previously missing)
       },
       material: {
         id: 'glass',
@@ -581,7 +544,6 @@ const RoofEditor: React.FC = () => {
       }
     };
     
-    // Log the new element for debugging
     console.log(`Adding new roof window at: (${newElement.position.x.toFixed(2)}, ${newElement.position.y.toFixed(2)}, ${newElement.position.z.toFixed(2)})`);
     
     addRoofElement(newElement);
@@ -736,10 +698,9 @@ const RoofEditor: React.FC = () => {
             <canvas
               ref={canvasRef}
               onMouseDown={handleMouseDown}
-              onMouseMove={handleMouseMove}
-              onMouseUp={handleMouseUp}
-              onMouseLeave={handleMouseUp}
-              className="cursor-move"
+              onMouseMove={handleMouseMove} // Could be removed if not implementing hover effects
+              // onMouseUp and onMouseLeave could be removed as they're not needed
+              className="cursor-default" // Change cursor style to default since we don't drag
             />
           </div>
         </div>
@@ -779,74 +740,30 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
     if (!element) return;
     
     const newPosition = { ...element.position };
-    const newRotation = { ...element.rotation };
+    newPosition[axis] = value;
     
-    if (axis === 'x') {
-      // X position is simple - just update it
-      newPosition.x = value;
-    } 
-    else if (axis === 'z') {
-      // Z position needs to update Y as well, to stay on the roof surface
-      newPosition.z = value;
+    const updates: any = { position: newPosition };
+    
+    // If we're changing Z position on a gable roof, adjust the rotation angle to match the roof slope
+    if (axis === 'z' && roofType === RoofType.Gable && element.type === RoofElementType.RoofWindow) {
+      const roofHeight = buildingDimensions.width * (roofPitch / 100);
+      const angle = Math.atan(roofHeight / (buildingDimensions.width / 2));
       
-      // Calculate Y position and rotation based on roof type
-      if (roofType === RoofType.Flat) {
-        // For flat roof, Y is just the roof height
-        newPosition.y = buildingDimensions.height + 0.05; // Half of window thickness
-      } 
-      else if (roofType === RoofType.Gable) {
-        // For gable roof, Y depends on distance from ridge
-        const roofHeight = buildingDimensions.width * (roofPitch / 100);
-        const ridgeHeight = buildingDimensions.height + roofHeight;
-        const halfWidth = buildingDimensions.width / 2;
-        
-        // Calculate distance from ridge
-        const distanceFromRidge = Math.abs(value);
-        
-        // Calculate ratio along the slope (0 at ridge, 1 at eave)
-        const ratio = Math.min(distanceFromRidge / halfWidth, 1);
-        
-        // Calculate Y position 
-        newPosition.y = ridgeHeight - (ratio * roofHeight);
-        
-        // Calculate rotation to match the roof slope
-        if (element.type === RoofElementType.RoofWindow) {
-          const angle = Math.atan(roofHeight / halfWidth);
-          
-          // FIXED: Front slope (negative Z) gets negative angle, back slope (positive Z) gets positive angle
-          newRotation.x = value < 0 ? -angle : angle;
-        }
-        newPosition.y += 0.05;
-      } 
-      else { // Monopitch
-        // For monopitch, Y depends on position along the slope
-        const roofHeight = buildingDimensions.width * (roofPitch / 100);
-        const highSideHeight = buildingDimensions.height + roofHeight;
-        
-        // Calculate ratio along the slope (0 at high side, 1 at low side)
-        const ratio = Math.min((value + buildingDimensions.width / 2) / buildingDimensions.width, 1);
-        
-        // Calculate Y position
-        newPosition.y = highSideHeight - (ratio * roofHeight);
-        
-        // Calculate rotation for roof windows
-        if (element.type === RoofElementType.RoofWindow) {
-          const angle = Math.atan(roofHeight / buildingDimensions.width);
-          newRotation.x = -angle; // Same angle everywhere on monopitch
-        }
-        newPosition.y += 0.05;
-      }
-    }
-    
-    // Update with new position and rotation
-    const updates: Partial<RoofElement> = { position: newPosition };
-    
-    // Always update rotation for roof windows to ensure they lie flat on the roof
-    if (element.type === RoofElementType.RoofWindow) {
+      // Determine side of roof based on z position and adjust rotation accordingly
+      // Front slope (negative Z) gets negative angle, back slope (positive Z) gets positive angle
+      const newRotation = { ...element.rotation };
+      newRotation.x = value < 0 ? -angle : angle;
+      
+      // Add rotation update
       updates.rotation = newRotation;
+      
+      console.log(`Adjusted roof window rotation to ${newRotation.x.toFixed(2)} radians based on z=${value}`);
     }
     
+    // Update element position and potentially rotation
     updateRoofElement(elementId, updates);
+    
+    console.log(`Updated ${axis} position to ${value}`);
   };
   
   const handleDimensionChange = (dim: 'width' | 'length', value: number) => {
@@ -948,9 +865,9 @@ const RoofElementProperties: React.FC<RoofElementPropertiesProps> = ({
       {/* Add dimension information for roof windows */}
       {element.type === RoofElementType.RoofWindow && (
         <div>
-          <label className="block text-xs font-medium text-light-gray mb-1">Dimensions</label>
+          <label className="block text-xs font-medium text-light-gray mb-1">Notes</label>
           <div className="bg-dark-gray p-2 rounded text-light-gray text-sm">
-            Fixed size: 1.3m × 1.3m
+            Dimensions can be adjusted up to 35m long x 2m wide
           </div>
         </div>
       )}

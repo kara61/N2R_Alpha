@@ -32,12 +32,15 @@ const RoofElementControls: React.FC = () => {
   };
   
   const handleDimensionChange = (dim: 'width' | 'length', value: number) => {
-    updateRoofElement(selectedRoofElementId, {
-      dimensions: {
-        ...selectedElement.dimensions,
-        [dim]: value
-      }
-    });
+    // Make sure dimensions object has length property
+    const updatedDimensions = { 
+      ...selectedElement.dimensions,
+      length: selectedElement.dimensions.length || 
+              (selectedElement.type === RoofElementType.RoofWindow ? 1.3 : 3),
+      [dim]: value 
+    };
+    
+    updateRoofElement(selectedRoofElementId, { dimensions: updatedDimensions });
   };
   
   const handleDelete = () => {
@@ -193,7 +196,7 @@ const RoofElementControls: React.FC = () => {
               <input
                 type="range"
                 min={0.5}
-                max={3}
+                max={selectedElement.type === RoofElementType.RoofWindow ? 2 : 3}
                 step={0.1}
                 value={selectedElement.dimensions.width}
                 onChange={(e) => handleDimensionChange('width', parseFloat(e.target.value))}
@@ -201,32 +204,37 @@ const RoofElementControls: React.FC = () => {
               />
               <input
                 type="number"
+                min={0.5}
+                max={selectedElement.type === RoofElementType.RoofWindow ? 2 : 3}
+                step={0.1}
                 value={selectedElement.dimensions.width.toFixed(1)}
                 onChange={(e) => handleDimensionChange('width', parseFloat(e.target.value))}
                 className="w-16 text-sm p-1 input-industrial"
               />
             </div>
             
-            {selectedElement.type === RoofElementType.RidgeSkylights && (
-              <div className="flex items-center">
-                <label className="w-16 text-sm text-light-gray">Length (m):</label>
-                <input
-                  type="range"
-                  min={1}
-                  max={20}
-                  step={0.5}
-                  value={selectedElement.dimensions.length || 1}
-                  onChange={(e) => handleDimensionChange('length', parseFloat(e.target.value))}
-                  className="flex-1 mr-2 accent-accent-yellow"
-                />
-                <input
-                  type="number"
-                  value={(selectedElement.dimensions.length || 1).toFixed(1)}
-                  onChange={(e) => handleDimensionChange('length', parseFloat(e.target.value))}
-                  className="w-16 text-sm p-1 input-industrial"
-                />
-              </div>
-            )}
+            {/* Allow length adjustment for both roof windows and ridge skylights */}
+            <div className="flex items-center">
+              <label className="w-16 text-sm text-light-gray">Length (m):</label>
+              <input
+                type="range"
+                min={1}
+                max={selectedElement.type === RoofElementType.RoofWindow ? 35 : 20}
+                step={0.5}
+                value={selectedElement.dimensions.length || 1}
+                onChange={(e) => handleDimensionChange('length', parseFloat(e.target.value))}
+                className="flex-1 mr-2 accent-accent-yellow"
+              />
+              <input
+                type="number"
+                min={1}
+                max={selectedElement.type === RoofElementType.RoofWindow ? 35 : 20}
+                step={0.5}
+                value={(selectedElement.dimensions.length || 1).toFixed(1)}
+                onChange={(e) => handleDimensionChange('length', parseFloat(e.target.value))}
+                className="w-16 text-sm p-1 input-industrial"
+              />
+            </div>
           </div>
         </div>
       </div>

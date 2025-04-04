@@ -71,14 +71,15 @@ const RoofElements: React.FC<RoofElementsProps> = ({
   // Updated renderRoofWindow function to show a single piece of glass without dividers
   const renderRoofWindow = (element: RoofElement) => {
     const { id, position, rotation, dimensions } = element;
-    // Fixed dimensions for roof window: 1.3m x 1.3m
-    const width = 1.3;
-    const length = 1.3;
-    const thickness = 0.08; // Thicker for better visibility
+    
+    // Use actual dimensions instead of fixed size
+    const width = dimensions.width || 1.3;
+    const length = dimensions.length || 1.3; // Use length property if available
+    const thickness = 0.08;
     
     // Create a glass material with improved visibility
     const glassMaterial = new THREE.MeshPhysicalMaterial({
-      color: '#78c8ff', // Brighter blue tint
+      color: '#78c8ff',
       roughness: 0.1,
       metalness: 0.3,
       transparent: true,
@@ -89,7 +90,12 @@ const RoofElements: React.FC<RoofElementsProps> = ({
       side: THREE.DoubleSide
     });
     
-    console.log(`Rendering roof window: position=${JSON.stringify(position)}, rotation=${JSON.stringify(rotation)}`);
+    // Calculate how many frame segments to add for longer windows
+    const segmentLength = 2.0; // Each segment is at most 2m long
+    const segmentCount = Math.max(1, Math.floor(length / segmentLength));
+    const adjustedSegmentLength = length / segmentCount; // Evenly space dividers
+    
+    console.log(`Rendering roof window: ${width}m wide, ${length}m long with ${segmentCount} segments`);
 
     return (
       <group 
@@ -98,19 +104,36 @@ const RoofElements: React.FC<RoofElementsProps> = ({
         rotation={[rotation.x, rotation.y, rotation.z]}
         userData={{ isRoofElement: true, id: id }}
       >
-        {/* Outer frame only - thicker and more pronounced */}
+        {/* Outer frame */}
         <mesh material={materials.frame} receiveShadow castShadow>
           <boxGeometry args={[length, thickness, width]} />
         </mesh>
         
-        {/* Single large glass pane - sits above the frame */}
+        {/* Glass pane - sits above the frame */}
         <mesh 
           position={[0, thickness * 0.7, 0]} 
           material={glassMaterial}
           receiveShadow
         >
-          <boxGeometry args={[length * 0.9, thickness/3, width * 0.9]} />
+          <boxGeometry args={[length * 0.98, thickness/3, width * 0.98]} />
         </mesh>
+        
+        {/* Add frame dividers for longer windows */}
+        {segmentCount > 1 && Array.from({ length: segmentCount - 1 }).map((_, idx) => {
+          // Calculate position for evenly spaced dividers
+          const xPos = -length/2 + adjustedSegmentLength * (idx + 1);
+          return (
+            <mesh 
+              key={`divider-${idx}`} 
+              position={[xPos, 0, 0]} 
+              material={materials.frame}
+              receiveShadow 
+              castShadow
+            >
+              <boxGeometry args={[0.05, thickness * 1.2, width]} />
+            </mesh>
+          );
+        })}
       </group>
     );
   };
