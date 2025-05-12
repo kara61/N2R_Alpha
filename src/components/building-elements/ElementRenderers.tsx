@@ -1,6 +1,26 @@
+// React is needed for JSX even though the linter thinks it's unused
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import React from 'react';
 import * as THREE from 'three';
 import { ElementType } from '../../types';
+
+interface ElementDimensions {
+  width: number;
+  height: number;
+  depth?: number;
+}
+
+interface ElementPosition {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface ElementRotation {
+  x: number;
+  y: number;
+  z: number;
+}
 
 /**
  * Renders a standard door element
@@ -207,12 +227,12 @@ export const renderLightBand = (
  */
 export const createElementRenderer = (
   type: ElementType, 
-  dimensions: any, 
-  position: any, 
-  rotation: any, 
-  material: any, 
-  frameMaterial: any, 
-  glassMaterial?: any
+  dimensions: ElementDimensions, 
+  position: ElementPosition, 
+  rotation: ElementRotation, 
+  material: THREE.Material, 
+  frameMaterial: THREE.Material, 
+  glassMaterial?: THREE.Material
 ) => {
   // Ensure vertical positioning is correct
   switch (type) {

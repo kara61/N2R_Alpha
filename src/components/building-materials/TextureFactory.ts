@@ -69,6 +69,8 @@ export const createPanelTexture = (color: string, isRoof: boolean = false): THRE
  * Create a texture for trapezoid sheet metal
  */
 export const createTrapezoidTexture = (color: string, isRoof: boolean = false): THREE.Texture => {
+  // The isRoof parameter can be used to adjust appearance for roof vs wall textures
+  // For now, we're using the same texture pattern for both
   const canvas = document.createElement('canvas');
   const size = 256;
   canvas.width = size;
@@ -320,12 +322,16 @@ export const createAoMap = (isTrapezoid: boolean): THREE.Texture => {
 /**
  * Get appropriate texture for a cladding type
  */
-export const getCladdingTexture = (claddingType: CladdingType, color: string, isRoof: boolean = false) => {
+interface CladdingTextures {
+  diffuseMap: THREE.Texture;
+  normalMap: THREE.Texture;
+  roughnessMap: THREE.Texture;
+  aoMap: THREE.Texture;
+}
+
+export const getCladdingTexture = (claddingType: CladdingType, color: string, isRoof: boolean = false): CladdingTextures => {
   // Create the appropriate texture based on cladding type
   let diffuseMap: THREE.Texture;
-  let normalMap: THREE.Texture;
-  let roughnessMap: THREE.Texture;
-  let aoMap: THREE.Texture;
   
   const isTrapezoid = claddingType === CladdingType.TrapezoidSheet;
   
@@ -337,13 +343,13 @@ export const getCladdingTexture = (claddingType: CladdingType, color: string, is
   }
   
   // Create normal map based on cladding type
-  normalMap = createNormalMap(isRoof, isTrapezoid);
+  const normalMap = createNormalMap(isRoof, isTrapezoid);
   
   // Create roughness map based on cladding type
-  roughnessMap = createRoughnessMap(isTrapezoid);
+  const roughnessMap = createRoughnessMap(isTrapezoid);
   
   // Create ambient occlusion map based on cladding type
-  aoMap = createAoMap(isTrapezoid);
+  const aoMap = createAoMap(isTrapezoid);
   
   return {
     diffuseMap,

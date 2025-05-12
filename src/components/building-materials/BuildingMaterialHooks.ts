@@ -1,14 +1,7 @@
 import { useMemo } from 'react';
 import * as THREE from 'three';
 import { CladdingType, RalColor } from '../../types';
-import { 
-  getCladdingTexture,
-  createPanelTexture,
-  createTrapezoidTexture,
-  createNormalMap,
-  createRoughnessMap,
-  createAoMap
-} from './TextureFactory';
+import { getCladdingTexture } from './TextureFactory';
 
 export interface MaterialsResult {
   structureMaterial: THREE.MeshStandardMaterial;
@@ -60,7 +53,8 @@ export const useBuildingMaterials = (
     });
     
     // Set texture mapping to ensure proper repeating
-    const textureScalingFactor = claddingType === CladdingType.TrapezoidSheet ? 0.5 : 0.25;
+    // Note: This scaling factor is applied within the getCladdingTexture function
+    // const textureScalingFactor = claddingType === CladdingType.TrapezoidSheet ? 0.5 : 0.25;
     
     // EAST-WEST WALLS MATERIAL (same as north-south but different orientation)
     const eastWestTextures = getCladdingTexture(claddingType, facadeHex, false);

@@ -4,7 +4,7 @@ import {
   calculateCanvasDimensions, 
   canvasToWallCoordinates, 
   wallToCanvasCoordinates,
-  isPointInElement,
+  // isPointInElement, // Commented out as it's not currently used
   getWallDimensions
 } from './FacadeEditorUtils';
 
@@ -42,14 +42,10 @@ const FacadeEditorCanvas: React.FC<FacadeEditorCanvasProps> = ({
   // Calculate and update canvas dimensions when necessary
   const updateCanvasDimensions = useCallback(() => {
     if (containerRef.current) {
-      const { width, height, scale } = calculateCanvasDimensions(
-        containerRef.current,
-        activeWall,
-        dimensions
-      );
+      // Get canvas dimensions based on container size and wall orientation
+      const { width, height } = calculateCanvasDimensions(containerRef.current, activeWall, dimensions);
       
       setCanvasDimensions({ width, height });
-      setScale(scale);
       
       if (canvasRef.current) {
         canvasRef.current.width = width;

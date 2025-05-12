@@ -17,7 +17,7 @@ export const calculateElementTransform = (
   const worldRotation = { ...rotation };
   
   // Calculate offset from wall
-  let offset = wallThickness / 2;
+  const offset = wallThickness / 2;
   
   // Adjust position and rotation based on which wall the element is on
   if (wall === WallType.North) {
